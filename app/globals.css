@@ -1,0 +1,206 @@
+@import "tailwindcss";
+
+/* ── @theme 브리지 ─────────────────────────────── */
+/* NOTE: --font-sans는 layout.tsx에서 notoSansKr.variable로 주입됨.
+   @theme 안에서 var()로 자기 자신을 참조하면 순환이 되므로, 여기서는 선언하지 않음.
+   Tailwind v4는 font-sans 유틸리티가 기본 제공되며, html className의 variable로 자동 연결됨. */
+@theme {
+  --color-bg-main:      var(--bg-main);
+  --color-bg-sub:       var(--bg-sub);
+  --color-bg-card:      var(--bg-card);
+  --color-bg-elevated:  var(--bg-elevated);
+
+  --color-text-main:    var(--text-main);
+  --color-text-sub:     var(--text-sub);
+  --color-text-muted:   var(--text-muted);
+
+  --color-point:        var(--point-color);
+  --color-point-hover:  var(--point-hover);
+  --color-point-ring:   var(--point-ring);
+
+  --color-border-main:   var(--border-main);
+  --color-border-subtle: var(--border-subtle);
+  --color-border-strong: var(--border-strong);
+
+  --color-danger:  #d32f2f;
+  --color-success: #2e7d32;
+  --color-warning: #e65100;
+
+  --shadow-nav:        0 -1px 0 0 var(--border-main);
+  --shadow-card:       none;
+  --shadow-card-hover: 0 0 0 2px var(--point-color);
+}
+
+/* ── 라이트 ─────────────────────────────────────── */
+:root {
+  --bg-main:     #ffffff;
+  --bg-sub:      #f7f7f7;
+  --bg-card:     #ffffff;
+  --bg-elevated: #ffffff;
+
+  --text-main:  #111111;
+  --text-sub:   #555555;
+  --text-muted: #aaaaaa;
+
+  --point-color: #1055d4;
+  --point-hover: #0d44b0;
+  --point-ring:  #90aef5;
+
+  --border-main:   #e8e8e8;
+  --border-subtle: #f0f0f0;
+  --border-strong: #cccccc;
+}
+
+/* ── 다크 ─────────────────────────────────────── */
+.dark {
+  --bg-main:     #0a0a0a;
+  --bg-sub:      #161616;
+  --bg-card:     #111111;
+  --bg-elevated: #1c1c1c;
+
+  --text-main:  #f5f5f5;
+  --text-sub:   #aaaaaa;
+  --text-muted: #555555;
+
+  --point-color: #4d82f5;
+  --point-hover: #6b99f7;
+  --point-ring:  #1055d4;
+
+  --border-main:   #2a2a2a;
+  --border-subtle: #1e1e1e;
+  --border-strong: #404040;
+}
+
+/* ── 리셋 ──────────────────────────────────────── */
+* {
+  /* layout.tsx에서 html에 notoSansKr.variable(--font-sans)를 주입하므로
+     여기서는 해당 변수를 그대로 참조 */
+  font-family: var(--font-sans), -apple-system, sans-serif;
+  font-weight: normal;
+}
+
+@layer base {
+  html, body {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: manipulation;
+    overflow: hidden;
+    height: 100%;
+    width: 100%;
+  }
+  input, textarea, [contenteditable="true"], .selectable {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+  img {
+    -webkit-touch-callout: none;
+    -webkit-user-drag: none;
+  }
+}
+
+body {
+  width: 100vw;
+  height: 100%;
+  color: var(--text-main);
+  background-color: #000;
+}
+
+/* ── 스크롤바 숨김 ─────────────────────────────── */
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ── 앱 레이아웃 ───────────────────────────────── */
+.app-container {
+  @apply absolute inset-0 m-auto h-full w-full max-w-md sm:max-w-xl;
+  background-color: var(--bg-main);
+  color: var(--text-main);
+}
+
+/* ── 카드 ─────────────────────────────────────── */
+.app-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-main);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+@media (hover: hover) {
+  .app-card:hover {
+    border-color: var(--point-color);
+    box-shadow: 0 0 0 1px var(--point-color);
+  }
+}
+.app-card:active { opacity: 0.75; }
+
+/* ── 버튼 ──────────────────────────────────────── */
+.btn-primary {
+  background: var(--point-color);
+  color: #fff;
+  border: 1.5px solid var(--point-color);
+  transition: opacity 0.12s;
+}
+.btn-primary:active { opacity: 0.8; }
+
+.btn-outline {
+  background: transparent;
+  color: var(--text-sub);
+  border: 1.5px solid var(--border-main);
+  transition: border-color 0.12s, color 0.12s;
+}
+.btn-outline:hover  { border-color: var(--point-color); color: var(--point-color); }
+.btn-outline:active { opacity: 0.7; }
+
+/* ── 섹션 구분선 ────────────────────────────────── */
+.section-divider {
+  height: 8px;
+  background: var(--bg-sub);
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+/* ── 스켈레톤 ──────────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--bg-sub) 25%,
+    var(--border-subtle) 50%,
+    var(--bg-sub) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+}
+
+/* ── 로딩 애니메이션 ─────────────────────────────── */
+@keyframes loading-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.animate-loading-spin {
+  animation: loading-spin 1s infinite linear;
+}
+
+@keyframes loading-bounce {
+  0%, 100% { transform: translateY(-25%); animation-timing-function: cubic-bezier(0.8,0,1,1); }
+  50% { transform: none; animation-timing-function: cubic-bezier(0,0,0.2,1); }
+}
+.animate-loading-bounce {
+  animation: loading-bounce 1s infinite;
+}
+
+@keyframes loading-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .5; }
+}
+.animate-loading-pulse {
+  animation: loading-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* ── safe area ──────────────────────────────────── */
+.pb-safe {
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+}

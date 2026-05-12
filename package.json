@@ -1,0 +1,59 @@
+{
+  "name": "market-radar",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "clean": "node -e \"fs.rmSync('.next', { recursive: true, force: true })\"",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@base-ui-components/react": "1.0.0-rc.0",
+    "@supabase/ssr": "^0.10.2",
+    "@supabase/supabase-js": "^2.105.0",
+    "@suspensive/react": "^3.17.0",
+    "@tanstack/react-query": "^5.90.11",
+    "@tanstack/react-query-devtools": "^5.91.1",
+    "@tanstack/react-virtual": "^3.13.18",
+    "browser-image-compression": "^2.0.2",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "dayjs": "^1.11.19",
+    "framer-motion": "^12.23.25",
+    "lottie-react": "^2.4.1",
+    "next": "16.2.4",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "react-hot-toast": "^2.6.0",
+    "react-icons": "^5.5.0",
+    "swiper": "^12.0.3",
+    "tailwind-merge": "^3.5.0",
+    "zustand": "^5.0.9"
+  },
+  "devDependencies": {
+    "@next/bundle-analyzer": "^16.0.10",
+    "@tailwindcss/postcss": "^4.1.17",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "autoprefixer": "^10.4.22",
+    "babel-plugin-react-compiler": "^1.0.0",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.4",
+    "eslint-config-prettier": "^10.1.8",
+    "postcss": "^8.5.6",
+    "prettier": "^3.7.3",
+    "prettier-plugin-tailwindcss": "^0.7.2",
+    "sharp": "^0.34.5",
+    "tailwindcss": "^4.1.17",
+    "typescript": "^5"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "sharp",
+      "unrs-resolver"
+    ]
+  }
+}
