@@ -147,7 +147,7 @@ export function DesktopView() {
                       </tr>
                     ))
                     : posts.map((post, i) => (
-                      <DesktopPostRow key={post.id} post={post} index={i} />
+                      <DesktopPostRow key={post.id} post={post} index={i} onAuthorClick={setSearchQuery} />
                     ))}
                 </tbody>
               </table>

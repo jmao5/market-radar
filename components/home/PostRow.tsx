@@ -9,7 +9,7 @@ dayjs.extend(relativeTime)
 dayjs.locale('ko')
 
 // ── 모바일: 게시글 행 ─────────────────────────────────────────
-export function MobilePostRow({ post }: { post: Omit<ForumPost, 'body_text'> }) {
+export function MobilePostRow({ post, onAuthorClick }: { post: Omit<ForumPost, 'body_text'>; onAuthorClick?: (author: string) => void }) {
   const router = useRouter()
   return (
     <button
@@ -21,7 +21,19 @@ export function MobilePostRow({ post }: { post: Omit<ForumPost, 'body_text'> }) 
           {post.title}
         </p>
         <div className="flex items-center gap-2.5 flex-wrap text-[11px]">
-          {post.author && <span className="text-[var(--text-sub)] font-medium">{post.author}</span>}
+          {post.author && (
+            <button
+              onClick={(e) => {
+                if (onAuthorClick) {
+                  e.stopPropagation()
+                  onAuthorClick(post.author!)
+                }
+              }}
+              className={`font-medium ${onAuthorClick ? 'text-[var(--text-main)] hover:text-[var(--point-color)] transition-colors' : 'text-[var(--text-sub)]'}`}
+            >
+              {post.author}
+            </button>
+          )}
           {post.view_count != null && (
             <span className="text-[var(--text-muted)]">
               조회 {post.view_count.toLocaleString()}
@@ -42,7 +54,7 @@ export function MobilePostRow({ post }: { post: Omit<ForumPost, 'body_text'> }) 
 }
 
 // ── 데스크탑: 게시글 테이블 행 ───────────────────────────────
-export function DesktopPostRow({ post, index }: { post: Omit<ForumPost, 'body_text'>; index: number }) {
+export function DesktopPostRow({ post, index, onAuthorClick }: { post: Omit<ForumPost, 'body_text'>; index: number; onAuthorClick?: (author: string) => void }) {
   const router = useRouter()
   return (
     <tr
@@ -63,7 +75,21 @@ export function DesktopPostRow({ post, index }: { post: Omit<ForumPost, 'body_te
         </span>
       </td>
       <td className="py-3.5 pr-4 text-[12px] w-28 whitespace-nowrap text-[var(--text-sub)]">
-        {post.author ?? '—'}
+        {post.author ? (
+          <button
+            onClick={(e) => {
+              if (onAuthorClick) {
+                e.stopPropagation()
+                onAuthorClick(post.author!)
+              }
+            }}
+            className={onAuthorClick ? 'hover:text-[var(--point-color)] transition-colors font-medium text-[var(--text-main)]' : ''}
+          >
+            {post.author}
+          </button>
+        ) : (
+          '—'
+        )}
       </td>
       <td className="py-3.5 pr-4 text-[12px] w-20 text-right whitespace-nowrap text-[var(--text-muted)] group-hover:text-[var(--text-sub)] transition-colors">
         {post.view_count != null ? post.view_count.toLocaleString() : '—'}

@@ -97,7 +97,7 @@ export function MobileView() {
 
         {postsLoading
           ? [1, 2, 3, 4, 5, 6].map((i) => <PostSkeleton key={i} />)
-          : posts.map((post) => <MobilePostRow key={post.id} post={post} />)}
+          : posts.map((post) => <MobilePostRow key={post.id} post={post} onAuthorClick={setSearchQuery} />)}
 
         {/* 무한 스크롤 옵저버 */}
         {hasNextPage && (

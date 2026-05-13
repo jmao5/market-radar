@@ -3,6 +3,7 @@ import { getForumPosts, searchForumPosts, getLatestMarketIndices, marketQueryKey
 import { useState, useCallback, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useDebounce } from '@/hooks/useDebounce'
+import { logger } from '@/lib/logger'
 
 export function useMarketData({ viewType }: { viewType: 'mobile' | 'desktop' }) {
   const queryClient = useQueryClient()
@@ -23,10 +24,10 @@ export function useMarketData({ viewType }: { viewType: 'mobile' | 'desktop' }) 
 
   // ── 데스크탑: 숫자 페이징 (useQuery) ──────────────────────────
   const { data: desktopData, isLoading: desktopLoading } = useQuery({
-    queryKey: debouncedQuery 
+    queryKey: debouncedQuery
       ? ['searchForumPosts', 'fmkorea_stock', debouncedQuery, 'desktop', page]
       : [...marketQueryKeys.forumPosts('fmkorea_stock'), 'desktop', page],
-    queryFn: () => 
+    queryFn: () =>
       debouncedQuery
         ? searchForumPosts({ source: 'fmkorea_stock', query: debouncedQuery, limit, page })
         : getForumPosts({ source: 'fmkorea_stock', limit, page }),
@@ -35,17 +36,17 @@ export function useMarketData({ viewType }: { viewType: 'mobile' | 'desktop' }) 
   })
 
   // ── 모바일: 무한 스크롤 (useInfiniteQuery) ──────────────────────
-  const { 
-    data: mobileData, 
+  const {
+    data: mobileData,
     isLoading: mobileLoading,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage
   } = useInfiniteQuery({
-    queryKey: debouncedQuery 
+    queryKey: debouncedQuery
       ? ['searchForumPosts', 'fmkorea_stock', debouncedQuery, 'mobile']
       : [...marketQueryKeys.forumPosts('fmkorea_stock'), 'mobile'],
-    queryFn: ({ pageParam }) => 
+    queryFn: ({ pageParam }) =>
       debouncedQuery
         ? searchForumPosts({ source: 'fmkorea_stock', query: debouncedQuery, limit, cursor: pageParam })
         : getForumPosts({ source: 'fmkorea_stock', limit, cursor: pageParam }),
@@ -56,7 +57,7 @@ export function useMarketData({ viewType }: { viewType: 'mobile' | 'desktop' }) 
   })
 
   // 🔴 뷰 타입에 따른 데이터 병합
-  const posts = viewType === 'desktop' 
+  const posts = viewType === 'desktop'
     ? desktopData?.items ?? []
     : mobileData?.pages.flatMap((p) => p.items) ?? []
 
@@ -66,7 +67,7 @@ export function useMarketData({ viewType }: { viewType: 'mobile' | 'desktop' }) 
   // 🔴 Supabase Realtime 구독 (DB가 변경되면 즉시 무효화하여 새로운 데이터를 가져옴)
   useEffect(() => {
     const supabase = createClient()
-    
+
     const channel = supabase
       .channel('market-radar-realtime')
       .on(
@@ -77,7 +78,7 @@ export function useMarketData({ viewType }: { viewType: 'mobile' | 'desktop' }) 
           table: 'forum_posts',
         },
         (payload) => {
-          console.log('Realtime Update Received!', payload)
+          logger.debug('Realtime 업데이트 수신', payload)
           // DB 변경이 감지되면 forumPosts 쿼리를 무효화하여 즉시 refetch 발생
           queryClient.invalidateQueries({
             queryKey: marketQueryKeys.forumPosts('fmkorea_stock'),
@@ -101,7 +102,7 @@ export function useMarketData({ viewType }: { viewType: 'mobile' | 'desktop' }) 
       })
       setLastUpdated(new Date())
     } catch (e) {
-      console.error('새로고침 실패:', e)
+      logger.error('새로고침 실패', e)
     } finally {
       setIsRefreshing(false)
     }
