@@ -7,36 +7,63 @@ import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import 'dayjs/locale/ko'
 import { useState, useCallback } from 'react'
-import { BiRefresh } from 'react-icons/bi'
+import { useRouter } from 'next/navigation'
+import { BiRefresh, BiTime, BiShow } from 'react-icons/bi'
+import { useIsMobile } from '@/hooks/useIsMobile'
 
 dayjs.extend(relativeTime)
 dayjs.locale('ko')
 
-// ── 카테고리별 색상 ───────────────────────────────────────────
-const CATEGORY_COLORS: Record<string, string> = {
-  국내주식: '#ef4444',
-  해외주식: '#22c55e',
-  잡담: '#92400e',
-  질문: '#b45309',
-  정보공유: '#7c3aed',
-  '종목추천,분석': '#ea580c',
-  매매기법: '#dc2626',
-  매매인증: '#0891b2',
-  실적발표: '#1d4ed8',
-  이벤트: '#db2777',
-  공지: '#374151',
+// ── 공통: 데이터 훅 ───────────────────────────────────────────
+function useMarketData() {
+  const queryClient = useQueryClient()
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
+
+  const { data: indices, isLoading: indicesLoading } = useQuery({
+    queryKey: marketQueryKeys.marketIndices(),
+    queryFn: getLatestMarketIndices,
+    staleTime: 1000 * 60 * 3,
+    refetchInterval: 1000 * 60 * 5,
+  })
+
+  const { data: postsData, isLoading: postsLoading } = useQuery({
+    queryKey: marketQueryKeys.forumPosts('fmkorea_stock'),
+    queryFn: () => getForumPosts({ source: 'fmkorea_stock', limit: 30 }),
+    staleTime: 1000 * 60 * 5,
+    refetchInterval: 1000 * 60 * 5,
+  })
+
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true)
+    try {
+      await fetch('/api/cron/scrape')
+      await queryClient.invalidateQueries({
+        queryKey: marketQueryKeys.forumPosts('fmkorea_stock'),
+      })
+      setLastUpdated(new Date())
+    } catch (e) {
+      console.error('새로고침 실패:', e)
+    } finally {
+      setIsRefreshing(false)
+    }
+  }, [queryClient])
+
+  return {
+    indices,
+    indicesLoading,
+    posts: postsData?.items ?? [],
+    postsLoading,
+    isRefreshing,
+    lastUpdated,
+    handleRefresh,
+  }
 }
 
-function getCategoryColor(category: string | null) {
-  if (!category) return 'var(--text-muted)'
-  return CATEGORY_COLORS[category] ?? 'var(--text-muted)'
-}
-
-// ── 시장 지수 카드 ────────────────────────────────────────────
+// ── 공통: 시장 지수 카드 ──────────────────────────────────────
 function MarketIndexCard({ index }: { index: MarketIndex }) {
   const direction = index.change_pct > 0 ? 'up' : index.change_pct < 0 ? 'down' : 'flat'
-  const color =
-    direction === 'up' ? '#ef4444' : direction === 'down' ? '#3b82f6' : 'var(--text-muted)'
+  const color = direction === 'up' ? '#ef4444' : direction === 'down' ? '#3b82f6' : 'var(--text-muted)'
 
   return (
     <div className="app-card flex flex-col gap-0.5 px-3 py-2.5 min-w-[96px]">
@@ -64,31 +91,31 @@ function MarketIndexSkeleton() {
   )
 }
 
-// ── 게시글 행 ─────────────────────────────────────────────────
-function PostRow({ post }: { post: Omit<ForumPost, 'body_text'> }) {
-  const categoryColor = getCategoryColor(post.source) // source 대신 카테고리 필드가 없으므로 임시
-
+// ── 공통: 게시글 스켈레톤 ────────────────────────────────────
+function PostSkeleton() {
   return (
-    <a
-      href={post.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="flex items-start gap-3 px-4 py-3 active:opacity-60 transition-opacity"
+    <div className="flex flex-col gap-2 px-4 py-3" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+      <div className="skeleton-shimmer h-3.5 w-4/5 rounded" />
+      <div className="skeleton-shimmer h-2.5 w-1/3 rounded" />
+    </div>
+  )
+}
+
+// ── 모바일: 게시글 행 ─────────────────────────────────────────
+function MobilePostRow({ post }: { post: Omit<ForumPost, 'body_text'> }) {
+  const router = useRouter()
+  return (
+    <button
+      onClick={() => router.push(`/posts/${post.id}`)}
+      className="flex items-start gap-3 px-4 py-3 w-full text-left active:opacity-60 transition-opacity"
       style={{ borderBottom: '1px solid var(--border-subtle)' }}
     >
       <div className="flex-1 min-w-0 flex flex-col gap-1">
-        <p
-          className="text-[13px] font-medium leading-snug line-clamp-2"
-          style={{ color: 'var(--text-main)' }}
-        >
+        <p className="text-[13px] font-medium leading-snug line-clamp-2" style={{ color: 'var(--text-main)' }}>
           {post.title}
         </p>
         <div className="flex items-center gap-2 flex-wrap">
-          {post.author && (
-            <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-              {post.author}
-            </span>
-          )}
+          {post.author && <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{post.author}</span>}
           {post.view_count != null && (
             <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
               조회 {post.view_count.toLocaleString()}
@@ -104,175 +131,236 @@ function PostRow({ post }: { post: Omit<ForumPost, 'body_text'> }) {
           </span>
         </div>
       </div>
-    </a>
-  )
-}
-
-function PostSkeleton() {
-  return (
-    <div
-      className="flex flex-col gap-2 px-4 py-3"
-      style={{ borderBottom: '1px solid var(--border-subtle)' }}
-    >
-      <div className="skeleton-shimmer h-3.5 w-4/5 rounded" />
-      <div className="skeleton-shimmer h-2.5 w-1/3 rounded" />
-    </div>
-  )
-}
-
-// ── 새로고침 버튼 ─────────────────────────────────────────────
-function RefreshButton({ onRefresh, isRefreshing }: { onRefresh: () => void; isRefreshing: boolean }) {
-  return (
-    <button
-      onClick={onRefresh}
-      disabled={isRefreshing}
-      className="flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-semibold transition-opacity active:opacity-60 disabled:opacity-40"
-      style={{
-        background: 'var(--bg-sub)',
-        color: 'var(--text-sub)',
-        border: '1px solid var(--border-main)',
-      }}
-      aria-label="새로고침"
-    >
-      <BiRefresh
-        size={14}
-        className={isRefreshing ? 'animate-loading-spin' : ''}
-      />
-      {isRefreshing ? '갱신 중' : '새로고침'}
     </button>
   )
 }
 
-// ── 홈 클라이언트 메인 ────────────────────────────────────────
-export default function HomeClient() {
-  const queryClient = useQueryClient()
-  const [isRefreshing, setIsRefreshing] = useState(false)
-  const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
+// ── 데스크탑: 게시글 테이블 행 ───────────────────────────────
+function DesktopPostRow({ post, index }: { post: Omit<ForumPost, 'body_text'>; index: number }) {
+  const router = useRouter()
+  return (
+    <tr
+      className="group transition-colors cursor-pointer"
+      style={{ borderBottom: '1px solid var(--border-subtle)' }}
+      onClick={() => router.push(`/posts/${post.id}`)}
+    >
+      <td className="py-3 pl-6 pr-3 text-[12px] w-8" style={{ color: 'var(--text-muted)' }}>
+        {index + 1}
+      </td>
+      <td className="py-3 pr-4">
+        <span
+          className="text-[13px] font-medium leading-snug line-clamp-1 group-hover:underline"
+          style={{ color: 'var(--text-main)' }}
+        >
+          {post.title}
+          {post.comment_count != null && post.comment_count > 0 && (
+            <span className="ml-1.5 text-[12px] font-bold" style={{ color: 'var(--point-color)' }}>
+              [{post.comment_count}]
+            </span>
+          )}
+        </span>
+      </td>
+      <td className="py-3 pr-4 text-[12px] w-28 whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
+        {post.author ?? '—'}
+      </td>
+      <td className="py-3 pr-4 text-[12px] w-20 text-right whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
+        {post.view_count != null ? post.view_count.toLocaleString() : '—'}
+      </td>
+      <td className="py-3 pr-6 text-[12px] w-24 text-right whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
+        {dayjs(post.scraped_at).fromNow()}
+      </td>
+    </tr>
+  )
+}
 
-  // 시장 지수
-  const { data: indices, isLoading: indicesLoading } = useQuery({
-    queryKey: marketQueryKeys.marketIndices(),
-    queryFn: getLatestMarketIndices,
-    staleTime: 1000 * 60 * 3,
-    refetchInterval: 1000 * 60 * 5, // 5분마다 자동 갱신
-  })
-
-  // 포럼 게시글
-  const { data: postsData, isLoading: postsLoading } = useQuery({
-    queryKey: marketQueryKeys.forumPosts('fmkorea_stock'),
-    queryFn: () => getForumPosts({ source: 'fmkorea_stock', limit: 30 }),
-    staleTime: 1000 * 60 * 5,
-    refetchInterval: 1000 * 60 * 5, // 5분마다 자동 갱신
-  })
-
-  const posts = postsData?.items ?? []
-
-  // 수동 새로고침: 스크래핑 API 호출 → 쿼리 무효화
-  const handleRefresh = useCallback(async () => {
-    setIsRefreshing(true)
-    try {
-      await fetch('/api/cron/scrape')
-      await queryClient.invalidateQueries({
-        queryKey: marketQueryKeys.forumPosts('fmkorea_stock'),
-      })
-      setLastUpdated(new Date())
-    } catch (e) {
-      console.error('새로고침 실패:', e)
-    } finally {
-      setIsRefreshing(false)
-    }
-  }, [queryClient])
+// ── 모바일 뷰 ─────────────────────────────────────────────────
+function MobileView() {
+  const { indices, indicesLoading, posts, postsLoading, isRefreshing, lastUpdated, handleRefresh } = useMarketData()
 
   return (
     <div className="flex flex-1 flex-col overflow-y-auto scrollbar-hide">
-
-      {/* ── 헤더 ── */}
+      {/* 헤더 */}
       <div
         className="flex items-center justify-between px-4 py-3 sticky top-0 z-10"
         style={{ background: 'var(--bg-main)', borderBottom: '1px solid var(--border-main)' }}
       >
-        <h1 className="text-base font-bold" style={{ color: 'var(--text-main)' }}>
-          📡 Market Radar
-        </h1>
+        <h1 className="text-base font-bold" style={{ color: 'var(--text-main)' }}>📡 Market Radar</h1>
         <div className="flex items-center gap-2">
           <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
             {dayjs(lastUpdated).format('HH:mm')} 기준
           </span>
-          <RefreshButton onRefresh={handleRefresh} isRefreshing={isRefreshing} />
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-semibold transition-opacity active:opacity-60 disabled:opacity-40"
+            style={{ background: 'var(--bg-sub)', color: 'var(--text-sub)', border: '1px solid var(--border-main)' }}
+          >
+            <BiRefresh size={14} className={isRefreshing ? 'animate-loading-spin' : ''} />
+            {isRefreshing ? '갱신 중' : '새로고침'}
+          </button>
         </div>
       </div>
 
-      {/* ── 시장 지수 ── */}
+      {/* 시장 지수 */}
       <section className="px-4 py-3">
-        <p
-          className="text-[10px] font-bold mb-2 tracking-widest uppercase"
-          style={{ color: 'var(--text-muted)' }}
-        >
+        <p className="text-[10px] font-bold mb-2 tracking-widest uppercase" style={{ color: 'var(--text-muted)' }}>
           시장 지수
         </p>
         <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
-          {indicesLoading ? (
-            [1, 2, 3, 4].map((i) => <MarketIndexSkeleton key={i} />)
-          ) : indices && indices.length > 0 ? (
-            indices.map((idx) => <MarketIndexCard key={idx.id} index={idx} />)
-          ) : (
-            <p className="text-xs py-2" style={{ color: 'var(--text-muted)' }}>
-              지수 데이터 없음 — C단계 추가 후 표시됩니다
-            </p>
-          )}
+          {indicesLoading
+            ? [1, 2, 3, 4].map((i) => <MarketIndexSkeleton key={i} />)
+            : indices && indices.length > 0
+              ? indices.map((idx) => <MarketIndexCard key={idx.id} index={idx} />)
+              : <p className="text-xs py-2" style={{ color: 'var(--text-muted)' }}>지수 데이터 없음</p>
+          }
         </div>
       </section>
 
-      {/* ── 구분선 ── */}
       <div className="section-divider" />
 
-      {/* ── 포럼 게시글 ── */}
+      {/* 게시글 */}
       <section className="flex flex-col">
         <div
           className="flex items-center justify-between px-4 py-2.5 sticky z-10"
-          style={{
-            top: '49px', // 헤더 높이만큼 offset
-            background: 'var(--bg-sub)',
-            borderBottom: '1px solid var(--border-subtle)',
-          }}
+          style={{ top: '49px', background: 'var(--bg-sub)', borderBottom: '1px solid var(--border-subtle)' }}
         >
-          <p
-            className="text-[10px] font-bold tracking-widest uppercase"
-            style={{ color: 'var(--text-muted)' }}
-          >
-            주갤
+          <p className="text-[10px] font-bold tracking-widest uppercase" style={{ color: 'var(--text-muted)' }}>
+            주갤 정보
           </p>
           <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
             {!postsLoading && posts.length > 0 ? `${posts.length}건` : ''}
           </span>
         </div>
-
-        {postsLoading ? (
-          [1, 2, 3, 4, 5, 6].map((i) => <PostSkeleton key={i} />)
-        ) : posts.length > 0 ? (
-          posts.map((post) => <PostRow key={post.id} post={post} />)
-        ) : (
-          <div className="flex flex-col items-center justify-center py-16 gap-3">
-            <span className="text-3xl">📭</span>
-            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-              게시글이 없습니다
-            </p>
-            <button
-              onClick={handleRefresh}
-              className="text-xs px-4 py-2 rounded-full"
-              style={{
-                background: 'var(--point-color)',
-                color: '#fff',
-              }}
-            >
-              지금 불러오기
-            </button>
-          </div>
-        )}
+        {postsLoading
+          ? [1, 2, 3, 4, 5, 6].map((i) => <PostSkeleton key={i} />)
+          : posts.map((post) => <MobilePostRow key={post.id} post={post} />)
+        }
       </section>
-
-      {/* ── 하단 여백 (Navbar 높이만큼) ── */}
       <div className="h-4" />
     </div>
   )
+}
+
+// ── 데스크탑 뷰 ───────────────────────────────────────────────
+function DesktopView() {
+  const { indices, indicesLoading, posts, postsLoading, isRefreshing, lastUpdated, handleRefresh } = useMarketData()
+
+  return (
+    <div className="flex flex-1 flex-col overflow-hidden">
+
+      {/* 상단 헤더 바 */}
+      <div
+        className="flex items-center justify-between px-6 py-4 flex-shrink-0"
+        style={{ background: 'var(--bg-main)', borderBottom: '1px solid var(--border-main)' }}
+      >
+        <div>
+          <h1 className="text-[18px] font-bold" style={{ color: 'var(--text-main)' }}>대시보드</h1>
+          <p className="text-[12px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+            에펨코리아 주식 갤러리 실시간 현황
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+            <BiTime size={14} />
+            {dayjs(lastUpdated).format('MM/DD HH:mm')} 기준
+          </div>
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-opacity disabled:opacity-40"
+            style={{ background: 'var(--point-color)', color: '#fff' }}
+          >
+            <BiRefresh size={14} className={isRefreshing ? 'animate-loading-spin' : ''} />
+            {isRefreshing ? '갱신 중...' : '새로고침'}
+          </button>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-5">
+
+        {/* 지수 카드 그리드 */}
+        <section>
+          <p className="text-[11px] font-bold mb-3 tracking-widest uppercase" style={{ color: 'var(--text-muted)' }}>
+            시장 지수
+          </p>
+          <div className="flex gap-3 flex-wrap">
+            {indicesLoading
+              ? [1, 2, 3, 4].map((i) => <MarketIndexSkeleton key={i} />)
+              : indices && indices.length > 0
+                ? indices.map((idx) => <MarketIndexCard key={idx.id} index={idx} />)
+                : (
+                  <div
+                    className="flex items-center gap-2 px-4 py-3 rounded-xl text-[13px]"
+                    style={{ background: 'var(--bg-card)', border: '1px solid var(--border-main)', color: 'var(--text-muted)' }}
+                  >
+                    지수 데이터 없음 — C단계 추가 후 표시됩니다
+                  </div>
+                )
+            }
+          </div>
+        </section>
+
+        {/* 게시글 테이블 */}
+        <section className="flex flex-col flex-1 min-h-0">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <p className="text-[11px] font-bold tracking-widest uppercase" style={{ color: 'var(--text-muted)' }}>
+                주갤 정보
+              </p>
+              {!postsLoading && posts.length > 0 && (
+                <span
+                  className="text-[10px] px-2 py-0.5 rounded-full font-semibold"
+                  style={{ background: 'var(--bg-sub)', color: 'var(--text-muted)', border: '1px solid var(--border-main)' }}
+                >
+                  {posts.length}건
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div
+            className="flex-1 overflow-hidden rounded-xl"
+            style={{ background: 'var(--bg-main)', border: '1px solid var(--border-main)' }}
+          >
+            <div className="overflow-y-auto h-full scrollbar-hide">
+              <table className="w-full border-collapse">
+                <thead className="sticky top-0 z-10" style={{ background: 'var(--bg-sub)' }}>
+                  <tr style={{ borderBottom: '1px solid var(--border-main)' }}>
+                    <th className="py-2.5 pl-6 pr-3 text-left text-[11px] font-semibold w-8" style={{ color: 'var(--text-muted)' }}>#</th>
+                    <th className="py-2.5 pr-4 text-left text-[11px] font-semibold" style={{ color: 'var(--text-muted)' }}>제목</th>
+                    <th className="py-2.5 pr-4 text-left text-[11px] font-semibold w-28" style={{ color: 'var(--text-muted)' }}>작성자</th>
+                    <th className="py-2.5 pr-4 text-right text-[11px] font-semibold w-20" style={{ color: 'var(--text-muted)' }}>
+                      <span className="flex items-center justify-end gap-1"><BiShow size={12} />조회</span>
+                    </th>
+                    <th className="py-2.5 pr-6 text-right text-[11px] font-semibold w-24" style={{ color: 'var(--text-muted)' }}>시간</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {postsLoading
+                    ? [1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                      <tr key={i} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                        <td colSpan={5} className="px-6 py-3">
+                          <div className="skeleton-shimmer h-3.5 w-full rounded" />
+                        </td>
+                      </tr>
+                    ))
+                    : posts.map((post, i) => (
+                      <DesktopPostRow key={post.id} post={post} index={i} />
+                    ))
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </div>
+  )
+}
+
+// ── 메인 진입점 ───────────────────────────────────────────────
+export default function HomeClient() {
+  const isMobile = useIsMobile()
+  return isMobile ? <MobileView /> : <DesktopView />
 }

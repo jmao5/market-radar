@@ -48,6 +48,7 @@ interface RawPost {
   view_count: number | null
   comment_count: number | null
   thumbnail_url: string | null
+  category: string | null
 }
 
 function parseFmkoreaStock(html: string): RawPost[] {
@@ -64,6 +65,9 @@ function parseFmkoreaStock(html: string): RawPost[] {
     if ($titleTd.length === 0) return
 
     // ── 제목 링크 ──────────────────────────────────────────────
+    // ── 카테고리 ────────────────────────────────────────────────
+    const category = $tr.find('td.cate a').first().text().trim() || null
+
     const $titleLink = $titleTd.find('a').first()
     const title = $titleLink.text().trim()
     const href = $titleLink.attr('href') || ''
@@ -94,7 +98,7 @@ function parseFmkoreaStock(html: string): RawPost[] {
       }
     }
 
-    posts.push({ post_id, title, author, url, view_count, comment_count, thumbnail_url: null })
+    posts.push({ post_id, title, author, url, view_count, comment_count, thumbnail_url: null, category })
   })
 
   return posts
@@ -147,6 +151,7 @@ async function scrapeTarget(target: (typeof TARGETS)[number]): Promise<ScrapeRes
       view_count: p.view_count,
       comment_count: p.comment_count,
       thumbnail_url: p.thumbnail_url,
+      category: p.category,
       scraped_at: now,
     }))
 

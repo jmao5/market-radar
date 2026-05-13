@@ -14,12 +14,23 @@ let isSchedulerRunning = false
 async function runScrape() {
   const now = new Date().toLocaleTimeString('ko-KR')
   try {
+    // 1단계: 목록 스크래핑
     const res = await fetch(`${BASE_URL}/api/cron/scrape`, { cache: 'no-store' })
     const json = await res.json()
     const inserted = json.results?.[0]?.inserted ?? 0
-    console.log(`[Scheduler ${now}] 스크래핑 완료 — ${inserted}건 저장`)
+    console.log(`[Scheduler ${now}] 목록 완료 — ${inserted}건 저장`)
+
+    // 2단계: 상세 스크래핑 (2초 후)
+    await new Promise((r) => setTimeout(r, 2_000))
+    const res2 = await fetch(`${BASE_URL}/api/cron/scrape-detail?limit=10`, { cache: 'no-store' })
+    const json2 = await res2.json()
+    if (json2.message) {
+      console.log(`[Scheduler ${now}] 상세 — ${json2.message}`)
+    } else {
+      console.log(`[Scheduler ${now}] 상세 완료 — ${json2.processed}건 처리, 댓글 ${json2.total_comments}건 저장`)
+    }
   } catch (err) {
-    console.error(`[Scheduler ${now}] 스크래핑 실패:`, err)
+    console.error(`[Scheduler ${now}] 실패:`, err)
   }
 }
 

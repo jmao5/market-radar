@@ -6,7 +6,7 @@
  */
 
 import { createClient } from './client'
-import type { ForumPost, MarketIndex, StockNews } from '@/types/market'
+import type { ForumPost, ForumComment, MarketIndex, StockNews } from '@/types/market'
 
 // ── 포럼 게시글 ───────────────────────────────────────────────
 
@@ -56,6 +56,22 @@ export async function getForumPostDetail(id: string): Promise<ForumPost> {
   return data as ForumPost
 }
 
+/**
+ * 게시글 댓글 목록 조회 (depth + created_at 순)
+ */
+export async function getForumComments(postId: string): Promise<ForumComment[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('forum_comments')
+    .select('*')
+    .eq('post_id', postId)
+    .order('depth', { ascending: true })
+    .order('created_at', { ascending: true })
+
+  if (error) throw error
+  return (data ?? []) as ForumComment[]
+}
+
 // ── 뉴스 ─────────────────────────────────────────────────────
 
 export async function getStockNews(limit = 20): Promise<StockNews[]> {
@@ -91,6 +107,7 @@ export async function getLatestMarketIndices(): Promise<MarketIndex[]> {
 export const marketQueryKeys = {
   forumPosts: (source?: string) => ['forumPosts', source ?? 'all'] as const,
   forumPostDetail: (id: string) => ['forumPost', id] as const,
+  forumComments: (postId: string) => ['forumComments', postId] as const,
   stockNews: () => ['stockNews'] as const,
   marketIndices: () => ['marketIndices'] as const,
 }

@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/scrape",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/scrape-detail?limit=10",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

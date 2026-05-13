@@ -9,11 +9,12 @@
  */
 
 const SCRAPE_URL = 'http://localhost:3000/api/cron/scrape'
+const DETAIL_URL = 'http://localhost:3000/api/cron/scrape-detail?limit=10'
 const INTERVAL_MS = 5 * 60 * 1000 // 5분
 
 async function runScrape() {
   const now = new Date().toLocaleTimeString('ko-KR')
-  process.stdout.write(`[${now}] 스크래핑 실행 중... `)
+  process.stdout.write(`[${now}] 목록 스크래핑 실행 중... `)
 
   try {
     const res = await fetch(SCRAPE_URL)
@@ -29,6 +30,34 @@ async function runScrape() {
   } catch (err) {
     console.log(`❌ 오류: ${err.message}`)
     console.log('   → pnpm dev 가 실행 중인지 확인하세요')
+    return
+  }
+
+  // 목록 완료 후 2초 대기 → 상세 스크래핑
+  await new Promise((r) => setTimeout(r, 2000))
+
+  const now2 = new Date().toLocaleTimeString('ko-KR')
+  process.stdout.write(`[${now2}] 상세 스크래핑 실행 중 (최대 10건)... `)
+
+  try {
+    const res2 = await fetch(DETAIL_URL)
+    const json2 = await res2.json()
+
+    if (json2.ok) {
+      console.log(
+        `✅ 완료 (${json2.processed}건 처리, 댓글 ${json2.total_comments}건 저장)`
+      )
+    } else if (json2.message) {
+      console.log(`ℹ️  ${json2.message}`)
+    } else {
+      const errs = json2.results
+        ?.filter((r) => r.errors?.length > 0)
+        .map((r) => r.errors.join(', '))
+        .join(' | ')
+      console.log(`⚠️  부분 실패: ${errs}`)
+    }
+  } catch (err) {
+    console.log(`❌ 상세 오류: ${err.message}`)
   }
 }
 

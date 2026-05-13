@@ -5,7 +5,7 @@
  * - Supabase 테이블 스키마와 1:1 대응
  */
 
-// ── 포럼 게시글 (에펨코리아 주갤 등) ─────────────────────────
+// ── 포럼 게시글 (주갤 정보 등) ─────────────────────────
 
 export interface ForumPost {
   id: string
@@ -14,6 +14,7 @@ export interface ForumPost {
   title: string
   author: string | null
   url: string              // 원본 URL (upsert 기준 unique key)
+  category: string | null  // 카테고리 (예: '잡담', '국내주식', '해외주식')
   view_count: number | null
   comment_count: number | null
   thumbnail_url: string | null
@@ -70,3 +71,29 @@ export interface MarketIndexDisplay extends MarketIndex {
 
 // ForumPost의 목록용 경량 버전 (body_text 제외)
 export type ForumPostSummary = Omit<ForumPost, 'body_text'>
+
+// ── 포럼 댓글 ─────────────────────────────────────────────────
+
+export interface ForumComment {
+  id: string
+  post_id: string          // forum_posts.id (UUID)
+  comment_srl: string      // 원본 댓글 ID (li#comment_{srl})
+  parent_srl: string | null// 대댓글인 경우 부모 댓글 srl
+  depth: number            // 0=일반, 1=대댓글, 2=대대댓글
+  author: string | null
+  content: string
+  voted_count: number
+  is_writer: boolean       // 원글 작성자 여부
+  scraped_at: string
+  created_at: string
+}
+
+// ── 상세 스크래핑 결과 ────────────────────────────────────────
+
+export interface DetailScrapeResult {
+  success: boolean
+  post_url: string
+  body_updated: boolean
+  comments_upserted: number
+  errors: string[]
+}
