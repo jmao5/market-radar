@@ -1,6 +1,7 @@
 import { useQuery, useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
 import { getForumPosts, searchForumPosts, getLatestMarketIndices, marketQueryKeys } from '@/lib/supabase/marketQueries'
 import { useState, useCallback, useEffect } from 'react'
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useDebounce } from '@/hooks/useDebounce'
 import { logger } from '@/lib/logger'
@@ -19,7 +20,23 @@ export function useMarketData({ viewType }: { viewType: 'mobile' | 'desktop' }) 
     refetchInterval: 1000 * 60 * 5,
   })
 
-  const [searchQuery, setSearchQuery] = useState('')
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
+  const searchQuery = searchParams.get('search') ?? ''
+  
+  const setSearchQuery = useCallback((query: string) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (query) {
+      params.set('search', query)
+    } else {
+      params.delete('search')
+    }
+    // 스크롤 유지하며 URL 업데이트 (history에 스택 추가됨)
+    router.push(`${pathname}?${params.toString()}`, { scroll: false })
+  }, [searchParams, pathname, router])
+
   const debouncedQuery = useDebounce(searchQuery, 300)
 
   // ── 데스크탑: 숫자 페이징 (useQuery) ──────────────────────────

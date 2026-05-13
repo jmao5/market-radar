@@ -47,7 +47,7 @@ function parseBody($: cheerio.CheerioAPI): string | null {
   const $content = $('article .xe_content').first()
   if ($content.length === 0) return null
 
-  $content.find('script, ins, iframe, .adsbygoogle').remove()
+  $content.find('script, ins, iframe, .adsbygoogle, video, audio').remove()
 
   const text = $content
     .text()
