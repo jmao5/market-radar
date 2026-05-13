@@ -1,0 +1,51 @@
+/* ── 게시글 본문 HTML 렌더링 ────────────────────── */
+.post-body {
+  color: var(--text-main);
+  font-size: 14px;
+  line-height: 1.8;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  -webkit-user-select: text;
+  user-select: text;
+}
+.post-body img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 6px 0;
+  display: block;
+}
+.post-body video {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 6px 0;
+  display: block;
+}
+.post-body .auto_media_wrapper {
+  max-width: 100% !important;
+  width: 100% !important;
+  margin: 8px 0 !important;
+}
+.post-body .height_keep {
+  position: relative;
+  padding-bottom: 56.25% !important;
+  height: 0;
+}
+.post-body .height_keep video {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 8px;
+}
+/* 에펨코리아 미디어엘리먼트 불필요 요소 제거 */
+.post-body .mejs__controls,
+.post-body .volume-layer,
+.post-body .controls-mouse-hover,
+.post-body .mejs__overlay-play,
+.post-body .custom-progress-bar { display: none !important; }
+.post-body .mejs__container { width: 100% !important; }
+.post-body p { margin: 4px 0; }
+.post-body a { color: var(--point-color); text-decoration: underline; }
+.post-body a.highslide { display: inline-block; text-decoration: none; }

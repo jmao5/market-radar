@@ -63,7 +63,7 @@ export async function getWatchedAuthorPosts(options?: {
       'id, source, post_id, title, author, url, category, view_count, comment_count, thumbnail_url, scraped_at, created_at',
       { count: 'exact' }
     )
-    .order('scraped_at', { ascending: false })
+    .order('created_at', { ascending: false })
 
   if (authors && authors.length > 0) {
     query = query.in('author', authors)
@@ -73,7 +73,7 @@ export async function getWatchedAuthorPosts(options?: {
     const from = (page - 1) * limit
     query = query.range(from, from + limit - 1)
   } else {
-    if (cursor) query = query.lt('scraped_at', cursor)
+    if (cursor) query = query.lt('created_at', cursor)
     query = query.limit(limit + 1)
   }
 
@@ -86,7 +86,7 @@ export async function getWatchedAuthorPosts(options?: {
   if (page === undefined) {
     const hasMore = items.length > limit
     items = hasMore ? items.slice(0, limit) : items
-    nextCursor = hasMore ? items[items.length - 1].scraped_at : null
+    nextCursor = hasMore ? items[items.length - 1].created_at : null
   }
 
   return { items, nextCursor, totalCount: count ?? 0 }

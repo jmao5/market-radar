@@ -49,6 +49,7 @@ interface RawPost {
   comment_count: number | null
   thumbnail_url: string | null
   category: string | null
+  posted_at: string | null   // 원본 게시 시간 (ISO 8601)
 }
 
 function parseFmkoreaStock(html: string): RawPost[] {
@@ -100,7 +101,29 @@ function parseFmkoreaStock(html: string): RawPost[] {
       }
     }
 
-    posts.push({ post_id, title, author, url, view_count, comment_count, thumbnail_url: null, category })
+    // ── 작성 시간 ── td.time: "17:29" 또는 "05.12" 또는 "2025.05.12" 형태
+    const timeRaw = $tr.find('td.time').first().text().trim()
+    let posted_at: string | null = null
+    if (timeRaw) {
+      const now = new Date()
+      if (/^\d{1,2}:\d{2}$/.test(timeRaw)) {
+        // "17:29" → 오늘 날짜 + 시간
+        const [h, m] = timeRaw.split(':').map(Number)
+        const d = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0)
+        posted_at = d.toISOString()
+      } else if (/^\d{2}\.\d{2}$/.test(timeRaw)) {
+        // "05.12" → 올해 + 월.일
+        const [mon, day] = timeRaw.split('.').map(Number)
+        const d = new Date(now.getFullYear(), mon - 1, day)
+        posted_at = d.toISOString()
+      } else if (/^\d{4}\.\d{2}\.\d{2}$/.test(timeRaw)) {
+        // "2025.05.12"
+        const [y, mon, day] = timeRaw.split('.').map(Number)
+        posted_at = new Date(y, mon - 1, day).toISOString()
+      }
+    }
+
+    posts.push({ post_id, title, author, url, view_count, comment_count, thumbnail_url: null, category, posted_at })
   })
 
   return posts
@@ -155,6 +178,7 @@ async function scrapeTarget(target: (typeof TARGETS)[number]): Promise<ScrapeRes
       thumbnail_url: p.thumbnail_url,
       category: p.category,
       scraped_at: now,
+      ...(p.posted_at ? { created_at: p.posted_at } : {}),
     }))
 
     const { error } = await supabase

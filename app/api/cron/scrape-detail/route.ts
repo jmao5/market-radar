@@ -1,191 +1,177 @@
 /**
  * app/api/cron/scrape-detail/route.ts
  *
- * 에펨코리아 게시글 상세 스크래핑 API
- * - forum_posts 중 body_text가 null인 최신 N건을 골라
- *   상세 페이지를 fetch → 본문 + 댓글을 파싱해 저장
+ * 게시글 상세 본문 + 댓글 스크래핑 API
  *
- * 호출: GET /api/cron/scrape-detail?limit=10
- * 보호: scrape route와 동일한 인증 방식
+ * 호출: GET /api/cron/scrape-detail?limit=5
+ * 동작: detail_scraped_at이 null인 게시글을 오래된 순으로 가져와
+ *       각각 상세 페이지를 긁어 body_html, 댓글을 저장
  *
- * 파싱 대상 HTML 구조 (에펨코리아 sketchbook5_elkha 스킨):
- *   본문  : article .xe_content
- *   댓글  : ul.fdb_lst_ul > li.fdb_itm
+ * HTML 구조 (실제 확인):
+ *   본문: article .xe_content (innerHTML 그대로 저장)
+ *   댓글: ul.fdb_lst_ul > li.fdb_itm
  *     - li#comment_{srl}
- *     - li.re → 대댓글 (style margin-left 기준 depth 계산)
- *     - .meta .member_plate : 작성자
- *     - .comment-content .xe_content : 내용
- *     - .xe_content a.findParent : 인용(멘션) 링크 → 제거
- *     - .vote .voted_count : 추천수
- *     - .document_writer : 원글 작성자 클래스
+ *     - li.re → 대댓글 (style="margin-left:2%" = depth 1, "margin-left:4%" = depth 2)
+ *     - .meta .member_plate → 작성자
+ *     - .comment-content .xe_content → 댓글 내용
+ *     - .voted_count → 추천수
+ *     - .document_writer → 원글 작성자 여부
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import * as cheerio from 'cheerio'
 import { createClient } from '@supabase/supabase-js'
-import type { DetailScrapeResult } from '@/types/market'
 
-// ── Supabase Admin ────────────────────────────────────────────
 function getAdminClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY!
-  return createClient(url, key, { auth: { persistSession: false } })
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false } }
+  )
 }
 
-// ── fetch 공통 헤더 ───────────────────────────────────────────
 const FETCH_HEADERS = {
-  'User-Agent':
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36',
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36',
   'Accept-Language': 'ko-KR,ko;q=0.9',
   Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
 }
 
-// ── 본문 파서 ─────────────────────────────────────────────────
-// 대상: article 안의 첫 번째 .xe_content div
-// 광고(ins.adsbygoogle), script, iframe 제거 후 텍스트 추출
-function parseBody($: cheerio.CheerioAPI): string | null {
+// ── 본문 + 댓글 파서 ──────────────────────────────────────────
+
+interface ParsedDetail {
+  bodyHtml: string
+  bodyText: string
+  voteCount: number
+  comments: {
+    comment_srl: string
+    parent_srl: string | null
+    depth: number
+    author: string | null
+    content: string
+    voted_count: number
+    is_writer: boolean
+  }[]
+}
+
+function parseDetail(html: string): ParsedDetail {
+  const $ = cheerio.load(html)
+
+  // ── 본문 HTML ───────────────────────────────────────────────
+  // article 안의 .xe_content (클래스명이 document_{srl}_{member_srl} 형태)
   const $content = $('article .xe_content').first()
-  if ($content.length === 0) return null
 
-  $content.find('script, ins, iframe, .adsbygoogle, video, audio').remove()
+  // 광고/불필요한 요소 제거
+  $content.find('script, style, .document_address').remove()
 
-  const text = $content
-    .text()
-    .split('\n')
-    .map((l) => l.trim())
-    .filter(Boolean)
-    .join('\n')
+  // 이미지 src를 절대 URL로 변환
+  $content.find('img').each((_, el) => {
+    const src = $(el).attr('src') || ''
+    if (src.startsWith('//')) $(el).attr('src', `https:${src}`)
+    // lazy load 처리
+    const dataSrc = $(el).attr('data-original') || $(el).attr('data-src')
+    if (dataSrc) $(el).attr('src', dataSrc.startsWith('//') ? `https:${dataSrc}` : dataSrc)
+  })
 
-  return text || null
-}
+  // 동영상 source src 절대 URL 변환
+  $content.find('source').each((_, el) => {
+    const src = $(el).attr('src') || ''
+    if (src.startsWith('//')) $(el).attr('src', `https:${src}`)
+  })
 
-// ── 댓글 depth 계산 ──────────────────────────────────────────
-// li.re의 style="margin-left:N%" 기준
-// 2% → depth 1, 4% → depth 2
-function parseDepth($li: cheerio.Cheerio<any>): number {
-  if (!$li.hasClass('re')) return 0
-  const style = $li.attr('style') || ''
-  const match = style.match(/margin-left:\s*(\d+)%/)
-  if (!match) return 1
-  return Math.round(parseInt(match[1], 10) / 2)
-}
+  // video poster 절대 URL 변환
+  $content.find('video').each((_, el) => {
+    const poster = $(el).attr('poster') || ''
+    if (poster.startsWith('//')) $(el).attr('poster', `https:${poster}`)
+  })
 
-// ── 댓글 파서 ─────────────────────────────────────────────────
-interface RawComment {
-  comment_srl: string
-  parent_srl: string | null
-  depth: number
-  author: string | null
-  content: string
-  voted_count: number
-  is_writer: boolean
-}
+  const bodyHtml = $content.html() ?? ''
+  const bodyText = $content.text().replace(/\s+/g, ' ').trim()
 
-function parseComments($: cheerio.CheerioAPI): RawComment[] {
-  const comments: RawComment[] = []
+  // ── 추천수 ─────────────────────────────────────────────────
+  const voteText = $('.new_voted_count, #fm_vote span.btn_img').first().text().trim()
+  const voteCount = parseInt(voteText.replace(/[^0-9]/g, ''), 10) || 0
 
-  $('ul.fdb_lst_ul li.fdb_itm').each((_, el) => {
+  // ── 댓글 파싱 ──────────────────────────────────────────────
+  const comments: ParsedDetail['comments'] = []
+
+  // 댓글 스택: 대댓글의 부모 추적
+  // margin-left:2% = depth 1, margin-left:4% = depth 2
+  const depthParentMap: Record<number, string> = {}
+
+  $('ul.fdb_lst_ul > li.fdb_itm').each((_, el) => {
     const $li = $(el)
 
-    // li#comment_{srl} 에서 srl 추출
+    // comment_srl: li#comment_{srl}
     const liId = $li.attr('id') || ''
-    const srlMatch = liId.match(/^comment_(\d+)$/)
+    const srlMatch = liId.match(/comment_(\d+)/)
     if (!srlMatch) return
+
     const comment_srl = srlMatch[1]
 
-    // depth
-    const depth = parseDepth($li)
+    // depth: margin-left 퍼센트로 판단
+    const marginStyle = $li.attr('style') || ''
+    const marginMatch = marginStyle.match(/margin-left:\s*(\d+)%/)
+    const marginPct = marginMatch ? parseInt(marginMatch[1], 10) : 0
+    const depth = marginPct === 0 ? 0 : marginPct === 2 ? 1 : 2
 
-    // 부모 srl — li.re의 경우 .xe_content a.findParent href에서 추출
-    // href 예시: "/9820054857/9820057286#comment_9820057286"
-    //            → 두 번째 숫자 세그먼트가 부모 comment_srl
-    let parent_srl: string | null = null
-    if (depth > 0) {
-      const parentHref = $li.find('.xe_content a.findParent').first().attr('href') || ''
-      // href 패턴: /{post_srl}/{parent_comment_srl}#comment_{parent_comment_srl}
-      const parentMatch = parentHref.match(/\/\d+\/(\d+)#comment_\d+/)
-      if (parentMatch) parent_srl = parentMatch[1]
-    }
+    // 부모 srl 추적
+    const parent_srl = depth > 0 ? (depthParentMap[depth - 1] ?? null) : null
+    depthParentMap[depth] = comment_srl
 
-    // 작성자 (레벨 이미지 alt 텍스트 제외, 닉네임만)
-    const author =
-      $li.find('.meta .member_plate').clone().find('img').remove().end().text().trim() || null
+    // 작성자
+    const author = $li.find('.meta .member_plate').first().text().trim() || null
 
-    // is_writer (원글 작성자 — .comment-content 에 .document_writer 클래스)
-    const is_writer = $li.find('.comment-content').hasClass('document_writer')
-
-    // 내용 — 멘션(findParent) 링크 텍스트를 제거한 뒤 추출
-    const $contentDiv = $li.find('.xe_content').first().clone()
-    $contentDiv.find('a.findParent').remove()
-    const content = $contentDiv
-      .text()
-      .split('\n')
-      .map((l) => l.trim())
-      .filter(Boolean)
-      .join(' ')
-      .trim()
-
+    // 내용 (.xe_content 안 텍스트, 대댓글 멘션 포함)
+    const $commentContent = $li.find('.comment-content .xe_content').first()
+    // findParent(멘션 링크) 텍스트 제거하고 본문만
+    $commentContent.find('a.findParent').remove()
+    const content = $commentContent.text().trim()
     if (!content) return
 
     // 추천수
-    const votedText = $li.find('.vote .voted_count').first().text().trim()
-    const voted_count = votedText ? parseInt(votedText, 10) || 0 : 0
+    const votedText = $li.find('.voted_count').first().text().trim()
+    const voted_count = parseInt(votedText.replace(/[^0-9]/g, ''), 10) || 0
+
+    // 원글 작성자 여부
+    const is_writer = $li.find('.comment-content').hasClass('document_writer')
 
     comments.push({ comment_srl, parent_srl, depth, author, content, voted_count, is_writer })
   })
 
-  return comments
+  return { bodyHtml, bodyText, voteCount, comments }
 }
 
 // ── 단일 게시글 상세 스크래핑 ────────────────────────────────
-async function scrapePostDetail(
-  postDbId: string,
-  postUrl: string
-): Promise<DetailScrapeResult> {
-  const result: DetailScrapeResult = {
-    success: false,
-    post_url: postUrl,
-    body_updated: false,
-    comments_upserted: 0,
-    errors: [],
-  }
+
+async function scrapePostDetail(post: { id: string; url: string; post_id: string }) {
+  const supabase = getAdminClient()
+  const now = new Date().toISOString()
 
   try {
-    const res = await fetch(postUrl, {
-      headers: FETCH_HEADERS,
-      cache: 'no-store',
-    })
-
-    if (!res.ok) {
-      result.errors.push(`HTTP ${res.status}: ${postUrl}`)
-      return result
-    }
+    const res = await fetch(post.url, { headers: FETCH_HEADERS, cache: 'no-store' })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
 
     const html = await res.text()
-    const $ = cheerio.load(html)
+    const { bodyHtml, bodyText, voteCount, comments } = parseDetail(html)
 
-    const body_text = parseBody($)
-    const rawComments = parseComments($)
-
-    const supabase = getAdminClient()
-    const now = new Date().toISOString()
-
-    // ── 본문 업데이트 ──────────────────────────────────────────
-    const { error: bodyErr } = await supabase
+    // 본문 업데이트
+    const { error: postError } = await supabase
       .from('forum_posts')
-      .update({ body_text: body_text ?? '', scraped_at: now })
-      .eq('id', postDbId)
+      .update({
+        body_html: bodyHtml,
+        body_text: bodyText,
+        vote_count: voteCount,
+        detail_scraped_at: now,
+        scraped_at: now,
+      })
+      .eq('id', post.id)
 
-    if (bodyErr) {
-      result.errors.push(`본문 업데이트 실패: ${bodyErr.message}`)
-    } else {
-      result.body_updated = true
-    }
+    if (postError) throw new Error(`Post update failed: ${postError.message}`)
 
-    // ── 댓글 upsert ────────────────────────────────────────────
-    if (rawComments.length > 0) {
-      const commentRows = rawComments.map((c) => ({
-        post_id: postDbId,
+    // 댓글 upsert
+    if (comments.length > 0) {
+      const commentRows = comments.map((c) => ({
+        post_id: post.id,
         comment_srl: c.comment_srl,
         parent_srl: c.parent_srl,
         depth: c.depth,
@@ -196,83 +182,72 @@ async function scrapePostDetail(
         scraped_at: now,
       }))
 
-      const { error: cErr } = await supabase
+      const { error: cmtError } = await supabase
         .from('forum_comments')
         .upsert(commentRows, { onConflict: 'post_id,comment_srl', ignoreDuplicates: false })
 
-      if (cErr) {
-        result.errors.push(`댓글 upsert 실패: ${cErr.message}`)
-      } else {
-        result.comments_upserted = rawComments.length
-      }
+      if (cmtError) throw new Error(`Comment upsert failed: ${cmtError.message}`)
     }
 
-    result.success = result.errors.length === 0
+    return { success: true, post_id: post.post_id, comments: comments.length }
   } catch (err) {
-    result.errors.push(`예외 발생: ${err instanceof Error ? err.message : String(err)}`)
+    return { success: false, post_id: post.post_id, error: String(err) }
   }
-
-  return result
 }
 
 // ── Route Handler ─────────────────────────────────────────────
+
 export async function GET(req: NextRequest) {
   const isProd = process.env.NODE_ENV === 'production'
 
   if (isProd) {
     const authHeader = req.headers.get('authorization')
     const cronSecret = req.headers.get('x-cron-secret')
-    const validVercel = authHeader === `Bearer ${process.env.CRON_SECRET}`
-    const validManual = cronSecret === process.env.CRON_SECRET
-    if (!validVercel && !validManual) {
+    if (
+      authHeader !== `Bearer ${process.env.CRON_SECRET}` &&
+      cronSecret !== process.env.CRON_SECRET
+    ) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
   }
 
-  // limit 및 id 파라미터
+  // 한 번에 처리할 게시글 수 (기본 5개, 최대 20개)
   const limitParam = req.nextUrl.searchParams.get('limit')
-  const limit = Math.min(parseInt(limitParam ?? '10', 10) || 10, 30)
-  const specificId = req.nextUrl.searchParams.get('id')
+  const limit = Math.min(parseInt(limitParam ?? '5', 10) || 5, 20)
 
   const supabase = getAdminClient()
 
-  let query = supabase
+  // detail_scraped_at이 null인 것 우선, 그다음 오래된 것
+  const { data: posts, error } = await supabase
     .from('forum_posts')
-    .select('id, url')
-    .is('body_text', null)
+    .select('id, url, post_id')
+    .or('detail_scraped_at.is.null,detail_scraped_at.lt.' + new Date(Date.now() - 30 * 60 * 1000).toISOString())
+    .order('detail_scraped_at', { ascending: true, nullsFirst: true })
+    .limit(limit)
 
-  if (specificId) {
-    query = query.eq('id', specificId).limit(1)
-  } else {
-    query = query.eq('source', 'fmkorea_stock').order('scraped_at', { ascending: false }).limit(limit)
-  }
-
-  const { data: posts, error: fetchErr } = await query
-
-  if (fetchErr) {
-    return NextResponse.json({ ok: false, error: fetchErr.message }, { status: 500 })
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
   if (!posts || posts.length === 0) {
-    return NextResponse.json({ ok: true, message: '처리할 게시글 없음', results: [] })
+    return NextResponse.json({ ok: true, message: '처리할 게시글 없음', processed: 0 })
   }
 
-  // 순차 처리 (에펨코리아 서버 부하 방지, 300ms 간격)
-  const results: DetailScrapeResult[] = []
+  // 순차 처리 (에펨코리아 rate limit 방지, 요청 간 500ms 딜레이)
+  const results = []
   for (const post of posts) {
-    const r = await scrapePostDetail(post.id, post.url)
-    results.push(r)
-    await new Promise((resolve) => setTimeout(resolve, 300))
+    const result = await scrapePostDetail(post)
+    results.push(result)
+    await new Promise((r) => setTimeout(r, 500))
   }
 
-  const successCount = results.filter((r) => r.success).length
-  const totalComments = results.reduce((sum, r) => sum + r.comments_upserted, 0)
+  const succeeded = results.filter((r) => r.success).length
 
   return NextResponse.json({
-    ok: successCount === results.length,
+    ok: succeeded === results.length,
     processed: results.length,
-    success: successCount,
-    total_comments: totalComments,
+    succeeded,
+    failed: results.length - succeeded,
     results,
   })
 }

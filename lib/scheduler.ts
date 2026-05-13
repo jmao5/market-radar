@@ -1,58 +1,29 @@
 /**
  * lib/scheduler.ts
  *
- * 스크래핑 스케줄러.
- * instrumentation.ts에서 서버 시작 시 딱 한 번 호출됩니다.
- * 프로덕션(Vercel)에서는 vercel.json cron이 대신하므로 자동으로 비활성화됩니다.
+ * 로컬 개발용 자동 스케줄러
+ * - 5분마다 목록 스크래핑
+ * - 3분마다 상세(본문+댓글) 스크래핑
  */
 
-const SCRAPE_INTERVAL_MS = 5 * 60 * 1000    // 5분 — 목록 + 상세
-const AUTHOR_INTERVAL_MS = 10 * 60 * 1000   // 10분 — 관심 작성자
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
-
 let isSchedulerRunning = false
 
-// ── 1단계 + 2단계: 목록 → 상세 ───────────────────────────────
-async function runScrape() {
+async function runScrape(label: string, url: string) {
   const now = new Date().toLocaleTimeString('ko-KR')
+  process.stdout?.write?.(`[Scheduler ${now}] ${label} 실행 중... `)
   try {
-    // 1단계: 목록 스크래핑
-    const res = await fetch(`${BASE_URL}/api/cron/scrape`, { cache: 'no-store' })
+    const res = await fetch(url, { cache: 'no-store' })
     const json = await res.json()
-    const inserted = json.results?.[0]?.inserted ?? 0
-    console.log(`[Scheduler ${now}] 목록 완료 — ${inserted}건 저장`)
-
-    // 2단계: 상세 스크래핑 (2초 후)
-    await new Promise((r) => setTimeout(r, 2_000))
-    const res2 = await fetch(`${BASE_URL}/api/cron/scrape-detail?limit=10`, { cache: 'no-store' })
-    const json2 = await res2.json()
-    if (json2.message) {
-      console.log(`[Scheduler ${now}] 상세 — ${json2.message}`)
+    if (label === '목록') {
+      const inserted = json.results?.[0]?.inserted ?? 0
+      console.log(`✅ ${inserted}건 저장`)
     } else {
-      console.log(
-        `[Scheduler ${now}] 상세 완료 — ${json2.processed}건 처리, 댓글 ${json2.total_comments}건 저장`
-      )
+      console.log(`✅ ${json.succeeded ?? 0}/${json.processed ?? 0}건 처리`)
     }
-  } catch (err) {
-    console.error(`[Scheduler ${now}] 실패:`, err)
-  }
-}
-
-// ── 3단계: 관심 작성자 수집 ──────────────────────────────────
-async function runAuthorScrape() {
-  const now = new Date().toLocaleTimeString('ko-KR')
-  try {
-    const res = await fetch(`${BASE_URL}/api/cron/scrape-author`, { cache: 'no-store' })
-    const json = await res.json()
-    if (json.message) {
-      console.log(`[AuthorScheduler ${now}] ${json.message}`)
-    } else {
-      console.log(
-        `[AuthorScheduler ${now}] 완료 — ${json.authors_processed}명 처리, ${json.total_inserted}건 저장`
-      )
-    }
-  } catch (err) {
-    console.error(`[AuthorScheduler ${now}] 실패:`, err)
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.log(`❌ ${msg}`)
   }
 }
 
@@ -60,25 +31,24 @@ export function startScheduler() {
   if (isSchedulerRunning) return
   isSchedulerRunning = true
 
-  // 프로덕션(Vercel)에서는 vercel.json cron이 담당
   if (process.env.NODE_ENV === 'production') {
-    console.log('[Scheduler] 프로덕션 환경 — Vercel Cron이 대신 실행합니다.')
+    console.log('[Scheduler] 프로덕션 — Vercel Cron이 대신 실행합니다.')
     return
   }
 
-  console.log(
-    `[Scheduler] 로컬 스케줄러 시작 — 목록 ${SCRAPE_INTERVAL_MS / 60000}분 / 작성자 ${AUTHOR_INTERVAL_MS / 60000}분 간격`
-  )
+  console.log('[Scheduler] 로컬 스케줄러 시작')
+  console.log('  · 목록 스크래핑: 5분 간격')
+  console.log('  · 상세 스크래핑: 3분 간격\n')
 
-  // 서버 시작 10초 뒤 첫 실행
-  setTimeout(() => {
-    runScrape()
-    setInterval(runScrape, SCRAPE_INTERVAL_MS)
-
-    // 작성자 수집 — 15초 뒤 첫 실행 (목록 스크래핑과 시차)
+  // 서버 완전 기동 후 10초 뒤 첫 실행
+  setTimeout(async () => {
+    await runScrape('목록', `${BASE_URL}/api/cron/scrape`)
     setTimeout(() => {
-      runAuthorScrape()
-      setInterval(runAuthorScrape, AUTHOR_INTERVAL_MS)
-    }, 5_000)
+      runScrape('상세', `${BASE_URL}/api/cron/scrape-detail?limit=10`)
+    }, 3000)
+
+    // 이후 반복
+    setInterval(() => runScrape('목록', `${BASE_URL}/api/cron/scrape`), 5 * 60 * 1000)
+    setInterval(() => runScrape('상세', `${BASE_URL}/api/cron/scrape-detail?limit=10`), 3 * 60 * 1000)
   }, 10_000)
 }

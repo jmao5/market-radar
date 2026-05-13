@@ -81,10 +81,10 @@ function AuthorPostsView({
   const posts = data?.pages.flatMap((p) => p.items) ?? []
 
   return (
-    <div className="flex flex-col min-h-full" style={{ background: 'var(--bg-main)' }}>
-      {/* 헤더 */}
+    <div className="flex flex-col flex-1 min-h-0 overflow-hidden" style={{ background: 'var(--bg-main)' }}>
+      {/* 헤더 (고정) */}
       <div
-        className="flex items-center gap-3 px-4 py-3 sticky top-0 z-10"
+        className="flex items-center gap-3 px-4 py-3 flex-shrink-0"
         style={{ background: 'var(--bg-main)', borderBottom: '1px solid var(--border-main)' }}
       >
         <button
@@ -107,39 +107,121 @@ function AuthorPostsView({
         </div>
       </div>
 
-      {/* 게시글 목록 */}
+      {/* 게시글 목록 (스크롤) */}
+      <div className="flex-1 overflow-y-auto scrollbar-hide">
+        {isLoading ? (
+          [1, 2, 3, 4, 5].map((i) => <PostSkeleton key={i} />)
+        ) : posts.length === 0 ? (
+          <div className="flex flex-col items-center gap-2 py-16 px-4 text-center">
+            <BiNews size={32} style={{ color: 'var(--text-muted)' }} />
+            <p className="text-[14px] font-semibold" style={{ color: 'var(--text-sub)' }}>
+              저장된 게시글이 없어요
+            </p>
+            <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
+              스크래핑이 실행되면 게시글이 채워집니다
+            </p>
+          </div>
+        ) : (
+          <>
+            {posts.map((post) => (
+              <MobilePostRow key={post.id} post={post} />
+            ))}
+            {hasNextPage && (
+              <div ref={ref} className="py-6 flex justify-center">
+                {isFetchingNextPage ? (
+                  <BiRefresh
+                    className="animate-spin"
+                    size={20}
+                    style={{ color: 'var(--text-muted)' }}
+                  />
+                ) : null}
+              </div>
+            )}
+            {!hasNextPage && (
+              <p className="py-6 text-center text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                모든 게시글을 불러왔습니다
+              </p>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────
+// 하위 뷰: 작성자별 그룹 피드
+// ─────────────────────────────────────────────────────────────
+type FeedMode = 'grouped' | 'timeline'
+
+function AuthorSection({
+  author,
+  onSelect,
+}: {
+  author: string
+  onSelect: (author: string) => void
+}) {
+  const PREVIEW_LIMIT = 5
+
+  const { data, isLoading } = useQuery({
+    queryKey: [...watchedAuthorQueryKeys.posts([author]), 'preview'],
+    queryFn: () => getWatchedAuthorPosts({ authors: [author], limit: PREVIEW_LIMIT }),
+    staleTime: 1000 * 60 * 3,
+  })
+
+  const posts = data?.items ?? []
+  const totalCount = data?.totalCount ?? 0
+
+  return (
+    <div className="flex flex-col" style={{ borderBottom: '6px solid var(--bg-sub)' }}>
+      {/* 작성자 헤더 */}
+      <button
+        onClick={() => onSelect(author)}
+        className="flex items-center gap-3 px-4 py-3 w-full text-left transition-colors active:bg-[var(--bg-sub)]"
+        style={{ background: 'var(--bg-main)', borderBottom: '1px solid var(--border-subtle)' }}
+      >
+        <div
+          className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full font-bold text-[13px]"
+          style={{ background: 'var(--point-color)20', color: 'var(--point-color)' }}
+        >
+          {author.slice(0, 1).toUpperCase()}
+        </div>
+        <div className="flex-1 flex flex-col">
+          <span className="text-[14px] font-bold" style={{ color: 'var(--text-main)' }}>
+            {author}
+          </span>
+          <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+            {isLoading ? '로딩...' : `게시글 ${totalCount}건`}
+          </span>
+        </div>
+        <span
+          className="text-[11px] px-2.5 py-1 rounded-full font-semibold"
+          style={{ background: 'var(--bg-sub)', color: 'var(--point-color)', border: '1px solid var(--border-main)' }}
+        >
+          전체보기 →
+        </span>
+      </button>
+
+      {/* 미리보기 게시글 */}
       {isLoading ? (
-        [1, 2, 3, 4, 5].map((i) => <PostSkeleton key={i} />)
+        [1, 2, 3].map((i) => <PostSkeleton key={i} />)
       ) : posts.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 py-16 px-4 text-center">
-          <BiNews size={32} style={{ color: 'var(--text-muted)' }} />
-          <p className="text-[14px] font-semibold" style={{ color: 'var(--text-sub)' }}>
-            저장된 게시글이 없어요
-          </p>
-          <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
-            스크래핑이 실행되면 게시글이 채워집니다
-          </p>
+        <div className="flex items-center justify-center py-6">
+          <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>수집된 게시글 없음</p>
         </div>
       ) : (
         <>
           {posts.map((post) => (
             <MobilePostRow key={post.id} post={post} />
           ))}
-          {hasNextPage && (
-            <div ref={ref} className="py-6 flex justify-center">
-              {isFetchingNextPage ? (
-                <BiRefresh
-                  className="animate-spin"
-                  size={20}
-                  style={{ color: 'var(--text-muted)' }}
-                />
-              ) : null}
-            </div>
-          )}
-          {!hasNextPage && (
-            <p className="py-6 text-center text-[11px]" style={{ color: 'var(--text-muted)' }}>
-              모든 게시글을 불러왔습니다
-            </p>
+          {totalCount > PREVIEW_LIMIT && (
+            <button
+              onClick={() => onSelect(author)}
+              className="py-3 text-center text-[12px] font-semibold transition-colors active:opacity-60"
+              style={{ color: 'var(--point-color)', borderTop: '1px solid var(--border-subtle)' }}
+            >
+              +{totalCount - PREVIEW_LIMIT}건 더 보기
+            </button>
           )}
         </>
       )}
@@ -147,15 +229,19 @@ function AuthorPostsView({
   )
 }
 
-// ─────────────────────────────────────────────────────────────
-// 하위 뷰: 전체 피드
-// ─────────────────────────────────────────────────────────────
-function FeedView({ authors }: { authors: string[] }) {
+function FeedView({
+  authors,
+  onSelectAuthor,
+}: {
+  authors: string[]
+  onSelectAuthor: (author: string) => void
+}) {
+  const [mode, setMode] = useState<FeedMode>('grouped')
   const { ref, inView } = useInView()
 
   const {
-    data,
-    isLoading,
+    data: timelineData,
+    isLoading: timelineLoading,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
@@ -166,14 +252,14 @@ function FeedView({ authors }: { authors: string[] }) {
     initialPageParam: null as string | null,
     getNextPageParam: (last) => last.nextCursor,
     staleTime: 1000 * 60 * 3,
-    enabled: authors.length > 0,
+    enabled: authors.length > 0 && mode === 'timeline',
   })
 
   useEffect(() => {
     if (inView && hasNextPage && !isFetchingNextPage) fetchNextPage()
   }, [inView, hasNextPage, isFetchingNextPage, fetchNextPage])
 
-  const posts = data?.pages.flatMap((p) => p.items) ?? []
+  const timelinePosts = timelineData?.pages.flatMap((p) => p.items) ?? []
 
   if (authors.length === 0) {
     return (
@@ -190,46 +276,70 @@ function FeedView({ authors }: { authors: string[] }) {
     )
   }
 
-  if (isLoading) {
-    return <>{[1, 2, 3, 4, 5, 6].map((i) => <PostSkeleton key={i} />)}</>
-  }
-
-  if (posts.length === 0) {
-    return (
-      <div className="flex flex-col items-center gap-2 py-16 px-4 text-center">
-        <BiNews size={32} style={{ color: 'var(--text-muted)' }} />
-        <p className="text-[14px] font-semibold" style={{ color: 'var(--text-sub)' }}>
-          아직 수집된 게시글이 없어요
-        </p>
-        <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>
-          스크래핑이 실행되면 자동으로 채워집니다
-        </p>
-      </div>
-    )
-  }
-
   return (
-    <>
-      {posts.map((post) => (
-        <MobilePostRow key={post.id} post={post} />
-      ))}
-      {hasNextPage && (
-        <div ref={ref} className="py-6 flex justify-center">
-          {isFetchingNextPage && (
-            <BiRefresh
-              className="animate-spin"
-              size={20}
-              style={{ color: 'var(--text-muted)' }}
-            />
+    <div className="flex flex-col">
+      {/* 모드 전환 토글 */}
+      <div
+        className="flex items-center gap-2 px-4 py-2.5 sticky top-0 z-10"
+        style={{ background: 'var(--bg-main)', borderBottom: '1px solid var(--border-subtle)' }}
+      >
+        {(['grouped', 'timeline'] as FeedMode[]).map((m) => (
+          <button
+            key={m}
+            onClick={() => setMode(m)}
+            className="px-3 py-1.5 rounded-full text-[12px] font-semibold transition-all"
+            style={{
+              background: mode === m ? 'var(--point-color)' : 'var(--bg-sub)',
+              color: mode === m ? '#fff' : 'var(--text-muted)',
+              border: mode === m ? 'none' : '1px solid var(--border-main)',
+            }}
+          >
+            {m === 'grouped' ? '👤 작성자별' : '🕐 시간순'}
+          </button>
+        ))}
+      </div>
+
+      {mode === 'grouped' ? (
+        /* ── 작성자별 그룹 뷰 ── */
+        authors.map((author) => (
+          <AuthorSection key={author} author={author} onSelect={onSelectAuthor} />
+        ))
+      ) : (
+        /* ── 타임라인 뷰 (기존) ── */
+        <>
+          {timelineLoading ? (
+            [1, 2, 3, 4, 5, 6].map((i) => <PostSkeleton key={i} />)
+          ) : timelinePosts.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-16 px-4 text-center">
+              <BiNews size={32} style={{ color: 'var(--text-muted)' }} />
+              <p className="text-[14px] font-semibold" style={{ color: 'var(--text-sub)' }}>
+                아직 수집된 게시글이 없어요
+              </p>
+            </div>
+          ) : (
+            timelinePosts.map((post) => (
+              <MobilePostRow key={post.id} post={post} />
+            ))
           )}
-        </div>
+          {hasNextPage && (
+            <div ref={ref} className="py-6 flex justify-center">
+              {isFetchingNextPage && (
+                <BiRefresh
+                  className="animate-spin"
+                  size={20}
+                  style={{ color: 'var(--text-muted)' }}
+                />
+              )}
+            </div>
+          )}
+          {!hasNextPage && timelinePosts.length > 0 && (
+            <p className="py-6 text-center text-[11px]" style={{ color: 'var(--text-muted)' }}>
+              모든 게시글을 불러왔습니다
+            </p>
+          )}
+        </>
       )}
-      {!hasNextPage && posts.length > 0 && (
-        <p className="py-6 text-center text-[11px]" style={{ color: 'var(--text-muted)' }}>
-          모든 게시글을 불러왔습니다
-        </p>
-      )}
-    </>
+    </div>
   )
 }
 
@@ -416,7 +526,7 @@ export default function UsersClient() {
   }
 
   return (
-    <div className="flex flex-col flex-1 overflow-hidden" style={{ background: 'var(--bg-main)' }}>
+    <div className="flex flex-col flex-1 min-h-0 overflow-hidden" style={{ background: 'var(--bg-main)' }}>
       {/* 헤더 */}
       <div
         className="flex items-center justify-between px-4 py-3"
@@ -463,7 +573,7 @@ export default function UsersClient() {
       {/* 탭 콘텐츠 */}
       <div className="flex-1 overflow-y-auto scrollbar-hide">
         {tab === 'feed' ? (
-          <FeedView authors={authorNames} />
+          <FeedView authors={authorNames} onSelectAuthor={setSelectedAuthor} />
         ) : (
           <AuthorsTab
             watchedAuthors={watchedAuthors}

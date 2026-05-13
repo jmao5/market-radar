@@ -26,7 +26,7 @@ export async function getForumPosts(options?: {
   let query = supabase
     .from('forum_posts')
     .select('id, source, post_id, title, author, url, view_count, comment_count, thumbnail_url, scraped_at, created_at', { count: 'exact' })
-    .order('scraped_at', { ascending: false })
+    .order('created_at', { ascending: false })
 
   if (source) query = query.eq('source', source)
   
@@ -35,7 +35,7 @@ export async function getForumPosts(options?: {
     const to = from + limit - 1
     query = query.range(from, to)
   } else {
-    if (cursor) query = query.lt('scraped_at', cursor)
+    if (cursor) query = query.lt('created_at', cursor)
     query = query.limit(limit + 1)
   }
 
@@ -48,7 +48,7 @@ export async function getForumPosts(options?: {
   if (page === undefined) {
     const hasMore = data.length > limit
     items = hasMore ? data.slice(0, limit) : data
-    nextCursor = hasMore ? items[items.length - 1].scraped_at : null
+    nextCursor = hasMore ? items[items.length - 1].created_at : null
   }
 
   return { items: items as Omit<ForumPost, 'body_text'>[], nextCursor, totalCount: count ?? 0 }
@@ -74,14 +74,14 @@ export async function searchForumPosts(options: {
     .select('id, source, post_id, title, author, url, category, view_count, comment_count, thumbnail_url, scraped_at, created_at', { count: 'exact' })
     .eq('source', source)
     .or(`title.ilike.${q},body_text.ilike.${q},author.ilike.${q}`)
-    .order('scraped_at', { ascending: false })
+    .order('created_at', { ascending: false })
 
   if (page !== undefined) {
     const from = (page - 1) * limit
     const to = from + limit - 1
     query = query.range(from, to)
   } else {
-    if (cursor) query = query.lt('scraped_at', cursor)
+    if (cursor) query = query.lt('created_at', cursor)
     query = query.limit(limit + 1)
   }
 
@@ -94,7 +94,7 @@ export async function searchForumPosts(options: {
   if (page === undefined) {
     const hasMore = data.length > limit
     items = hasMore ? data.slice(0, limit) : data
-    nextCursor = hasMore ? items[items.length - 1].scraped_at : null
+    nextCursor = hasMore ? items[items.length - 1].created_at : null
   }
 
   return { items: items as Omit<ForumPost, 'body_text'>[], nextCursor, totalCount: count ?? 0 }
