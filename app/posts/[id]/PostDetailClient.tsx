@@ -9,7 +9,7 @@
  * - is_writer = true → 작성자 뱃지
  */
 
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   getForumPostDetail,
   getForumComments,
@@ -123,12 +123,19 @@ export default function PostDetailClient({
     staleTime: 1000 * 60 * 3,
   })
 
-  // body_text가 없으면 상세 스크래핑 트리거 (fire-and-forget)
+  const queryClient = useQueryClient()
+
+  // body_text가 없으면 상세 스크래핑 트리거 후 즉시 새로고침
   useEffect(() => {
     if (post && post.body_text === null) {
-      fetch(`/api/cron/scrape-detail?limit=1`).catch(() => { })
+      fetch(`/api/cron/scrape-detail?id=${post.id}`)
+        .then(() => {
+          queryClient.invalidateQueries({ queryKey: marketQueryKeys.forumPostDetail(id) })
+          queryClient.invalidateQueries({ queryKey: marketQueryKeys.forumComments(id) })
+        })
+        .catch(() => {})
     }
-  }, [post])
+  }, [post, id, queryClient])
 
   const topComments = comments.filter((c) => c.depth === 0)
   // comment_srl 기준으로 대댓글 그룹핑

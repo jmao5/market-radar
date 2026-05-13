@@ -229,20 +229,25 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // limit 파라미터 (기본 10, 최대 30)
+  // limit 및 id 파라미터
   const limitParam = req.nextUrl.searchParams.get('limit')
   const limit = Math.min(parseInt(limitParam ?? '10', 10) || 10, 30)
+  const specificId = req.nextUrl.searchParams.get('id')
 
   const supabase = getAdminClient()
 
-  // body_text가 null인 게시글 중 최신순으로 limit건 조회
-  const { data: posts, error: fetchErr } = await supabase
+  let query = supabase
     .from('forum_posts')
     .select('id, url')
     .is('body_text', null)
-    .eq('source', 'fmkorea_stock')
-    .order('scraped_at', { ascending: false })
-    .limit(limit)
+
+  if (specificId) {
+    query = query.eq('id', specificId).limit(1)
+  } else {
+    query = query.eq('source', 'fmkorea_stock').order('scraped_at', { ascending: false }).limit(limit)
+  }
+
+  const { data: posts, error: fetchErr } = await query
 
   if (fetchErr) {
     return NextResponse.json({ ok: false, error: fetchErr.message }, { status: 500 })
