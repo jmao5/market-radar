@@ -2,18 +2,30 @@ import type { ForumPost } from '@/types/market'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import 'dayjs/locale/ko'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { BiShow } from 'react-icons/bi'
 
 dayjs.extend(relativeTime)
 dayjs.locale('ko')
 
+interface MobilePostRowProps {
+  post: Omit<ForumPost, 'body_text'>
+  onAuthorClick?: (author: string) => void
+}
+
+interface DesktopPostRowProps {
+  post: Omit<ForumPost, 'body_text'>
+  index: number
+  onAuthorClick?: (author: string) => void
+}
+
 // ── 모바일: 게시글 행 ─────────────────────────────────────────
-export function MobilePostRow({ post, onAuthorClick }: { post: Omit<ForumPost, 'body_text'>; onAuthorClick?: (author: string) => void }) {
-  const router = useRouter()
+// 외부 래퍼를 <button> → <Link>로 교체: <button> 중첩 방지 (HTML 스펙 위반)
+export function MobilePostRow({ post, onAuthorClick }: MobilePostRowProps) {
   return (
-    <button
-      onClick={() => router.push(`/posts/${post.id}`)}
+    <Link
+      href={`/posts/${post.id}`}
       className="flex items-start gap-3 px-5 py-3.5 w-full text-left transition-all active:scale-[0.98] active:bg-[var(--bg-sub)] border-b border-[var(--border-subtle)]"
     >
       <div className="flex-1 min-w-0 flex flex-col gap-1.5">
@@ -23,8 +35,10 @@ export function MobilePostRow({ post, onAuthorClick }: { post: Omit<ForumPost, '
         <div className="flex items-center gap-2.5 flex-wrap text-[11px]">
           {post.author && (
             <button
+              type="button"
               onClick={(e) => {
                 if (onAuthorClick) {
+                  e.preventDefault()
                   e.stopPropagation()
                   onAuthorClick(post.author!)
                 }
@@ -49,12 +63,12 @@ export function MobilePostRow({ post, onAuthorClick }: { post: Omit<ForumPost, '
           </span>
         </div>
       </div>
-    </button>
+    </Link>
   )
 }
 
 // ── 데스크탑: 게시글 테이블 행 ───────────────────────────────
-export function DesktopPostRow({ post, index, onAuthorClick }: { post: Omit<ForumPost, 'body_text'>; index: number; onAuthorClick?: (author: string) => void }) {
+export function DesktopPostRow({ post, index, onAuthorClick }: DesktopPostRowProps) {
   const router = useRouter()
   return (
     <tr
@@ -77,6 +91,7 @@ export function DesktopPostRow({ post, index, onAuthorClick }: { post: Omit<Foru
       <td className="py-3.5 pr-4 text-[12px] w-28 whitespace-nowrap text-[var(--text-sub)]">
         {post.author ? (
           <button
+            type="button"
             onClick={(e) => {
               if (onAuthorClick) {
                 e.stopPropagation()
