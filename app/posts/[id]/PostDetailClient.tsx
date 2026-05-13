@@ -126,7 +126,7 @@ export default function PostDetailClient({
   // body_text가 없으면 상세 스크래핑 트리거 (fire-and-forget)
   useEffect(() => {
     if (post && post.body_text === null) {
-      fetch(`/api/cron/scrape-detail?limit=1`).catch(() => {})
+      fetch(`/api/cron/scrape-detail?limit=1`).catch(() => { })
     }
   }, [post])
 
@@ -233,7 +233,7 @@ export default function PostDetailClient({
               style={{ background: 'var(--point-color)', color: '#fff' }}
             >
               <BiLinkExternal size={13} />
-              원본 에펨코리아에서 보기
+              원본 보기
             </a>
           </div>
         )}

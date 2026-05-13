@@ -1,0 +1,32 @@
+# Market Radar AI Coding Guidelines
+
+이 파일은 향후 AI 에이전트(MCP 등)가 코드를 수정하거나 추가할 때 반드시 따라야 하는 프로젝트 규칙입니다.
+
+## Tech Stack
+- Framework: Next.js 16.x (App Router)
+- React: 19.x
+- Styling: Tailwind CSS 4.x
+- Data Fetching: TanStack Query v5 + Suspensive
+- Backend/DB: Supabase (supabase-js, ssr)
+- Utils: dayjs, lottie-react, framer-motion, zustand
+
+## Architecture & Code Style
+1. **역할 분리 (Separation of Concerns)**
+   - `page.tsx`는 서버 컴포넌트로서 메타데이터 설정 및 초기 데이터 패칭 등 최소한의 역할만 수행합니다.
+   - 실제 UI와 인터랙션은 `*Client.tsx` 형태로 클라이언트 컴포넌트를 분리하여 작성합니다.
+   - 복잡한 비즈니스 로직 및 TanStack Query 데이터 패칭 로직은 커스텀 훅(e.g., `hooks/useMarketData.ts`)으로 추출합니다.
+
+2. **스타일링 (Styling)**
+   - 인라인 스타일(`style={{ ... }}`)의 사용을 지양하고 **반드시 Tailwind CSS 유틸리티 클래스**를 사용합니다.
+   - 글로벌 CSS 변수(`--text-main`, `--bg-sub` 등)를 사용할 때는 `text-[var(--text-main)]` 형식이나 `tailwind.config.ts`에 정의된 테마를 활용합니다.
+
+3. **타입스크립트 (TypeScript)**
+   - `any` 타입 사용을 엄격히 금지합니다.
+   - 컴포넌트의 Props, 함수의 파라미터 및 반환 타입은 명시적으로 정의합니다.
+
+4. **데이터 패칭 규칙 (Supabase & React Query)**
+   - 리스트 데이터를 반환하는 쿼리 함수(e.g., `marketQueries.ts`)는 항상 무한 스크롤 및 페이지네이션을 고려하여 `{ items: T[], nextCursor: string | null }` 형태의 일관된 구조를 반환해야 합니다.
+
+## AI Assistant Instructions
+- 코드 작성 전 항상 기존에 구현된 컴포넌트, 훅, 유틸리티 함수가 있는지 확인하고 재사용을 우선시하세요.
+- 기능을 추가할 때 파일 하나가 너무 비대해지지 않도록 적절히 파일을 분할하세요.

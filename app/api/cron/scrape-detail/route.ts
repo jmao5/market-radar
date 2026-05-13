@@ -62,7 +62,7 @@ function parseBody($: cheerio.CheerioAPI): string | null {
 // ── 댓글 depth 계산 ──────────────────────────────────────────
 // li.re의 style="margin-left:N%" 기준
 // 2% → depth 1, 4% → depth 2
-function parseDepth($li: cheerio.Cheerio<cheerio.Element>): number {
+function parseDepth($li: cheerio.Cheerio<any>): number {
   if (!$li.hasClass('re')) return 0
   const style = $li.attr('style') || ''
   const match = style.match(/margin-left:\s*(\d+)%/)

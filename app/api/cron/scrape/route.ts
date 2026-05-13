@@ -1,7 +1,7 @@
 /**
  * app/api/cron/scrape/route.ts
  *
- * 에펨코리아 주식 갤러리 목록 스크래핑 API
+ * 주식 갤러리 목록 스크래핑 API
  *
  * 호출: GET /api/cron/scrape
  * 보호:
@@ -31,7 +31,7 @@ const TARGETS = [
   },
 ]
 
-// ── 에펨코리아 주식 갤러리 파서 ──────────────────────────────
+// ── 주식 갤러리 파서 ──────────────────────────────
 // 실제 HTML 구조:
 //   table.bd_lst > tbody > tr  (notice 클래스 = 공지)
 //   td.cate  : 카테고리

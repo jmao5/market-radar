@@ -6,10 +6,7 @@ const withBundleAnalyzer = bundleAnalyzer({ enabled: process.env.ANALYZE === 'tr
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   reactCompiler: true,
-  // instrumentation.ts 활성화 (서버 시작 시 스케줄러 자동 등록)
-  experimental: {
-    instrumentationHook: true,
-  },
+  // instrumentation.ts는 Next.js 최신 버전에서 기본 지원되므로 설정 생략 가능
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: '**' },

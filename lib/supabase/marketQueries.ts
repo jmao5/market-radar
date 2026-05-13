@@ -18,27 +18,40 @@ export async function getForumPosts(options?: {
   source?: string
   limit?: number
   cursor?: string | null
+  page?: number
 }) {
-  const { source, limit = 30, cursor } = options ?? {}
+  const { source, limit = 30, cursor, page } = options ?? {}
   const supabase = createClient()
 
   let query = supabase
     .from('forum_posts')
-    .select('id, source, post_id, title, author, url, view_count, comment_count, thumbnail_url, scraped_at, created_at')
+    .select('id, source, post_id, title, author, url, view_count, comment_count, thumbnail_url, scraped_at, created_at', { count: 'exact' })
     .order('scraped_at', { ascending: false })
-    .limit(limit + 1)
 
   if (source) query = query.eq('source', source)
-  if (cursor) query = query.lt('scraped_at', cursor)
+  
+  if (page !== undefined) {
+    const from = (page - 1) * limit
+    const to = from + limit - 1
+    query = query.range(from, to)
+  } else {
+    if (cursor) query = query.lt('scraped_at', cursor)
+    query = query.limit(limit + 1)
+  }
 
-  const { data, error } = await query
+  const { data, error, count } = await query
   if (error) throw error
 
-  const hasMore = data.length > limit
-  const items = hasMore ? data.slice(0, limit) : data
-  const nextCursor = hasMore ? items[items.length - 1].scraped_at : null
+  let items = data
+  let nextCursor = null
 
-  return { items: items as Omit<ForumPost, 'body_text'>[], nextCursor }
+  if (page === undefined) {
+    const hasMore = data.length > limit
+    items = hasMore ? data.slice(0, limit) : data
+    nextCursor = hasMore ? items[items.length - 1].scraped_at : null
+  }
+
+  return { items: items as Omit<ForumPost, 'body_text'>[], nextCursor, totalCount: count ?? 0 }
 }
 
 /**
@@ -49,21 +62,42 @@ export async function searchForumPosts(options: {
   query: string
   source?: string
   limit?: number
-}): Promise<Omit<ForumPost, 'body_text'>[]> {
-  const { query, source = 'fmkorea_stock', limit = 30 } = options
+  cursor?: string | null
+  page?: number
+}): Promise<{ items: Omit<ForumPost, 'body_text'>[]; nextCursor: string | null; totalCount: number }> {
+  const { query: searchQuery, source = 'fmkorea_stock', limit = 30, cursor, page } = options
   const supabase = createClient()
-  const q = `%${query}%`
+  const q = `%${searchQuery}%`
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('forum_posts')
-    .select('id, source, post_id, title, author, url, category, view_count, comment_count, thumbnail_url, scraped_at, created_at')
+    .select('id, source, post_id, title, author, url, category, view_count, comment_count, thumbnail_url, scraped_at, created_at', { count: 'exact' })
     .eq('source', source)
     .or(`title.ilike.${q},body_text.ilike.${q},author.ilike.${q}`)
     .order('scraped_at', { ascending: false })
-    .limit(limit)
 
+  if (page !== undefined) {
+    const from = (page - 1) * limit
+    const to = from + limit - 1
+    query = query.range(from, to)
+  } else {
+    if (cursor) query = query.lt('scraped_at', cursor)
+    query = query.limit(limit + 1)
+  }
+
+  const { data, error, count } = await query
   if (error) throw error
-  return (data ?? []) as Omit<ForumPost, 'body_text'>[]
+
+  let items = data
+  let nextCursor = null
+
+  if (page === undefined) {
+    const hasMore = data.length > limit
+    items = hasMore ? data.slice(0, limit) : data
+    nextCursor = hasMore ? items[items.length - 1].scraped_at : null
+  }
+
+  return { items: items as Omit<ForumPost, 'body_text'>[], nextCursor, totalCount: count ?? 0 }
 }
 
 /**

@@ -22,53 +22,49 @@
   --color-border-subtle: var(--border-subtle);
   --color-border-strong: var(--border-strong);
 
-  --color-danger:  #d32f2f;
-  --color-success: #2e7d32;
-  --color-warning: #e65100;
-
-  --shadow-nav:        0 -1px 0 0 var(--border-main);
-  --shadow-card:       none;
-  --shadow-card-hover: 0 0 0 2px var(--point-color);
+  --color-danger:  #ef4444; /* red-500 */
+  --color-success: #10b981; /* emerald-500 */
+  --color-warning: #f59e0b; /* amber-500 */
 }
 
 /* ── 라이트 ─────────────────────────────────────── */
 :root {
   --bg-main:     #ffffff;
-  --bg-sub:      #f7f7f7;
+  --bg-sub:      #fafafa; /* zinc-50 */
   --bg-card:     #ffffff;
   --bg-elevated: #ffffff;
 
-  --text-main:  #111111;
-  --text-sub:   #555555;
-  --text-muted: #aaaaaa;
+  --text-main:   #18181b; /* zinc-900 */
+  --text-sub:    #52525b; /* zinc-600 */
+  --text-muted:  #a1a1aa; /* zinc-400 */
 
-  --point-color: #1055d4;
-  --point-hover: #0d44b0;
-  --point-ring:  #90aef5;
+  --point-color: #4f46e5; /* indigo-600 */
+  --point-hover: #4338ca; /* indigo-700 */
+  --point-ring:  #c7d2fe; /* indigo-200 */
 
-  --border-main:   #e8e8e8;
-  --border-subtle: #f0f0f0;
-  --border-strong: #cccccc;
+  --border-main:   #e4e4e7; /* zinc-200 */
+  --border-subtle: #f4f4f5; /* zinc-100 */
+  --border-strong: #d4d4d8; /* zinc-300 */
 }
 
 /* ── 다크 ─────────────────────────────────────── */
 .dark {
-  --bg-main:     #0a0a0a;
-  --bg-sub:      #161616;
-  --bg-card:     #111111;
-  --bg-elevated: #1c1c1c;
+  --bg-main:     #09090b; /* zinc-950 */
+  --bg-sub:      #18181b; /* zinc-900 */
+  --bg-card:     #09090b;
+  --bg-elevated: #27272a; /* zinc-800 */
 
-  --text-main:  #f5f5f5;
-  --text-sub:   #aaaaaa;
-  --text-muted: #555555;
+  --text-main:   #f4f4f5; /* zinc-100 */
+  --text-sub:    #a1a1aa; /* zinc-400 */
+  --text-muted:  #52525b; /* zinc-600 */
 
-  --point-color: #4d82f5;
-  --point-hover: #6b99f7;
-  --point-ring:  #1055d4;
+  --point-color: #6366f1; /* indigo-500 */
+  --point-hover: #818cf8; /* indigo-400 */
+  --point-ring:  #3730a3; /* indigo-800 */
 
-  --border-main:   #2a2a2a;
-  --border-subtle: #1e1e1e;
-  --border-strong: #404040;
+  --border-main:   #27272a; /* zinc-800 */
+  --border-subtle: #18181b; /* zinc-900 */
+  --border-strong: #3f3f46; /* zinc-700 */
 }
 
 /* ── 리셋 ──────────────────────────────────────── */
@@ -121,17 +117,18 @@ body {
 .app-card {
   background-color: var(--bg-card);
   border: 1px solid var(--border-main);
-  border-radius: 12px;
+  border-radius: 16px; /* slightly more rounded */
   overflow: hidden;
-  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 @media (hover: hover) {
   .app-card:hover {
-    border-color: var(--point-color);
-    box-shadow: 0 0 0 1px var(--point-color);
+    border-color: var(--border-strong);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    transform: translateY(-1px);
   }
 }
-.app-card:active { opacity: 0.75; }
+.app-card:active { opacity: 0.85; transform: scale(0.98); }
 
 /* ── 버튼 ──────────────────────────────────────── */
 .btn-primary {
