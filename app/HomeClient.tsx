@@ -249,7 +249,7 @@ function MobileView() {
             <BiSearch className="absolute left-3" style={{ color: 'var(--text-muted)' }} size={16} />
             <input
               type="text"
-              placeholder="제목, 본문 검색..."
+              placeholder="제목, 본문, 작성자 검색..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-transparent text-[13px] outline-none pl-9 pr-3 py-2 rounded-xl"
@@ -353,7 +353,7 @@ function DesktopView() {
               <BiSearch className="absolute left-3" style={{ color: 'var(--text-muted)' }} size={16} />
               <input
                 type="text"
-                placeholder="제목, 본문 검색..."
+                placeholder="제목, 본문, 작성자 검색..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full bg-transparent text-[12px] outline-none pl-9 pr-3 py-1.5 rounded-lg transition-colors focus:border-[var(--point-color)]"

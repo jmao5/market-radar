@@ -42,7 +42,7 @@ export async function getForumPosts(options?: {
 }
 
 /**
- * 게시글 검색 (제목 + 본문 ilike)
+ * 게시글 검색 (제목 + 본문 + 작성자 ilike)
  * Supabase or() 필터 사용
  */
 export async function searchForumPosts(options: {
@@ -58,7 +58,7 @@ export async function searchForumPosts(options: {
     .from('forum_posts')
     .select('id, source, post_id, title, author, url, category, view_count, comment_count, thumbnail_url, scraped_at, created_at')
     .eq('source', source)
-    .or(`title.ilike.${q},body_text.ilike.${q}`)
+    .or(`title.ilike.${q},body_text.ilike.${q},author.ilike.${q}`)
     .order('scraped_at', { ascending: false })
     .limit(limit)
 
