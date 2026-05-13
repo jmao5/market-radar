@@ -42,6 +42,31 @@ export async function getForumPosts(options?: {
 }
 
 /**
+ * 게시글 검색 (제목 + 본문 ilike)
+ * Supabase or() 필터 사용
+ */
+export async function searchForumPosts(options: {
+  query: string
+  source?: string
+  limit?: number
+}): Promise<Omit<ForumPost, 'body_text'>[]> {
+  const { query, source = 'fmkorea_stock', limit = 30 } = options
+  const supabase = createClient()
+  const q = `%${query}%`
+
+  const { data, error } = await supabase
+    .from('forum_posts')
+    .select('id, source, post_id, title, author, url, category, view_count, comment_count, thumbnail_url, scraped_at, created_at')
+    .eq('source', source)
+    .or(`title.ilike.${q},body_text.ilike.${q}`)
+    .order('scraped_at', { ascending: false })
+    .limit(limit)
+
+  if (error) throw error
+  return (data ?? []) as Omit<ForumPost, 'body_text'>[]
+}
+
+/**
  * 단일 게시글 상세 조회 (body_text 포함)
  */
 export async function getForumPostDetail(id: string): Promise<ForumPost> {

@@ -1,15 +1,16 @@
 'use client'
 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { getForumPosts, getLatestMarketIndices, marketQueryKeys } from '@/lib/supabase/marketQueries'
+import { getForumPosts, searchForumPosts, getLatestMarketIndices, marketQueryKeys } from '@/lib/supabase/marketQueries'
 import type { MarketIndex, ForumPost } from '@/types/market'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import 'dayjs/locale/ko'
 import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { BiRefresh, BiTime, BiShow } from 'react-icons/bi'
+import { BiRefresh, BiTime, BiShow, BiSearch } from 'react-icons/bi'
 import { useIsMobile } from '@/hooks/useIsMobile'
+import { useDebounce } from '@/hooks/useDebounce'
 
 dayjs.extend(relativeTime)
 dayjs.locale('ko')
@@ -27,9 +28,17 @@ function useMarketData() {
     refetchInterval: 1000 * 60 * 5,
   })
 
+  const [searchQuery, setSearchQuery] = useState('')
+  const debouncedQuery = useDebounce(searchQuery, 300)
+
   const { data: postsData, isLoading: postsLoading } = useQuery({
-    queryKey: marketQueryKeys.forumPosts('fmkorea_stock'),
-    queryFn: () => getForumPosts({ source: 'fmkorea_stock', limit: 30 }),
+    queryKey: debouncedQuery 
+      ? ['searchForumPosts', 'fmkorea_stock', debouncedQuery]
+      : marketQueryKeys.forumPosts('fmkorea_stock'),
+    queryFn: () => 
+      debouncedQuery
+        ? searchForumPosts({ source: 'fmkorea_stock', query: debouncedQuery, limit: 30 })
+        : getForumPosts({ source: 'fmkorea_stock', limit: 30 }),
     staleTime: 1000 * 60 * 5,
     refetchInterval: 1000 * 60 * 5,
   })
@@ -52,11 +61,13 @@ function useMarketData() {
   return {
     indices,
     indicesLoading,
-    posts: postsData?.items ?? [],
+    posts: postsData?.items ?? (Array.isArray(postsData) ? postsData : []),
     postsLoading,
     isRefreshing,
     lastUpdated,
     handleRefresh,
+    searchQuery,
+    setSearchQuery,
   }
 }
 
@@ -175,7 +186,7 @@ function DesktopPostRow({ post, index }: { post: Omit<ForumPost, 'body_text'>; i
 
 // ── 모바일 뷰 ─────────────────────────────────────────────────
 function MobileView() {
-  const { indices, indicesLoading, posts, postsLoading, isRefreshing, lastUpdated, handleRefresh } = useMarketData()
+  const { indices, indicesLoading, posts, postsLoading, isRefreshing, lastUpdated, handleRefresh, searchQuery, setSearchQuery } = useMarketData()
 
   return (
     <div className="flex flex-1 flex-col overflow-y-auto scrollbar-hide">
@@ -231,6 +242,26 @@ function MobileView() {
             {!postsLoading && posts.length > 0 ? `${posts.length}건` : ''}
           </span>
         </div>
+
+        {/* 검색창 */}
+        <div className="px-4 py-2.5" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+          <div className="relative flex items-center">
+            <BiSearch className="absolute left-3" style={{ color: 'var(--text-muted)' }} size={16} />
+            <input
+              type="text"
+              placeholder="제목, 본문 검색..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-transparent text-[13px] outline-none pl-9 pr-3 py-2 rounded-xl"
+              style={{
+                background: 'var(--bg-card)',
+                color: 'var(--text-main)',
+                border: '1px solid var(--border-main)',
+              }}
+            />
+          </div>
+        </div>
+
         {postsLoading
           ? [1, 2, 3, 4, 5, 6].map((i) => <PostSkeleton key={i} />)
           : posts.map((post) => <MobilePostRow key={post.id} post={post} />)
@@ -243,7 +274,7 @@ function MobileView() {
 
 // ── 데스크탑 뷰 ───────────────────────────────────────────────
 function DesktopView() {
-  const { indices, indicesLoading, posts, postsLoading, isRefreshing, lastUpdated, handleRefresh } = useMarketData()
+  const { indices, indicesLoading, posts, postsLoading, isRefreshing, lastUpdated, handleRefresh, searchQuery, setSearchQuery } = useMarketData()
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
@@ -315,6 +346,23 @@ function DesktopView() {
                   {posts.length}건
                 </span>
               )}
+            </div>
+            
+            {/* 검색창 */}
+            <div className="relative flex items-center w-64">
+              <BiSearch className="absolute left-3" style={{ color: 'var(--text-muted)' }} size={16} />
+              <input
+                type="text"
+                placeholder="제목, 본문 검색..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-transparent text-[12px] outline-none pl-9 pr-3 py-1.5 rounded-lg transition-colors focus:border-[var(--point-color)]"
+                style={{
+                  background: 'var(--bg-card)',
+                  color: 'var(--text-main)',
+                  border: '1px solid var(--border-main)',
+                }}
+              />
             </div>
           </div>
 
