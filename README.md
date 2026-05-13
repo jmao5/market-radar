@@ -828,21 +828,6 @@ const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
 
 ## 12. 알려진 이슈 및 결정 사항
 
-### React Compiler & Turbopack
-
-`reactCompiler: true`는 현재 비활성화 상태입니다. Turbopack(`turbopack: {}`)과 동시 사용 시 `babel-plugin-react-compiler` 설정 충돌이 발생할 수 있습니다. 활성화 방법은 `next.config.ts` 주석을 참고하세요.
-
-### `{app` 폴더 (수동 삭제 필요)
-
-프로젝트 루트에 `{app`으로 시작하는 이상한 폴더가 존재합니다. Windows에서 glob 패턴이 잘못 처리되어 생성된 것으로, 빌드나 런타임에 영향은 없지만 삭제가 권장됩니다.
-
-```powershell
-# PowerShell에서 실행
-Remove-Item -Recurse -Force '.\{app'
-```
-
-> MCP 파일시스템 도구에 삭제 기능이 없어 자동 삭제가 불가능합니다.
-
 ### Lottie 동적 로딩
 
 `<Loading variant="lottie" />`는 `lottie-react`와 `/lottie/waiting.json`을 동적으로 로드합니다. 둘 중 하나라도 없으면 `spinner` 폴백으로 자동 전환되며 런타임 에러가 발생하지 않습니다.
@@ -858,10 +843,6 @@ Remove-Item -Recurse -Force '.\{app'
 ### SmartImage vs next/image
 
 `SmartImage`는 Next.js `<Image>` 대신 `<img>` 태그를 직접 사용합니다. Supabase Storage, 외부 CDN 등 `next.config.ts`의 `remotePatterns` 설정 없이 모든 `https://` URL을 처리하기 위한 의도적인 결정입니다. 이미지 최적화가 중요한 경우 `next/image`로 교체를 고려하세요.
-
-### Form 컴포넌트 이름 마이그레이션
-
-`JmanaSelect` / `JmanaSwitch` / `JmanaSlider`는 이전 프로젝트 이름이 남아있던 것으로, `AppSelect` / `AppSwitch` / `AppSlider`로 변경되었습니다. 기존 이름은 `@deprecated` alias로 유지되어 빌드 에러 없이 동작하지만, 새 코드에서는 `App*` 이름을 사용하세요.
 
 ---
 
