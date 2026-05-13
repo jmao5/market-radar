@@ -81,8 +81,10 @@ function parseFmkoreaStock(html: string): RawPost[] {
     const replyText = $titleTd.find('a.replyNum').first().text().trim()
     const comment_count = replyText ? parseInt(replyText.replace(/[^0-9]/g, ''), 10) || null : null
 
-    // ── 작성자 ──────────────────────────────────────────────────
-    const author = $tr.find('td.author .member_plate').text().trim() || null
+    // ── 작성자 (레벨 이미지 alt 텍스트 제외, 닉네임만) ────────────
+    const $authorCell = $tr.find('td.author .member_plate').clone()
+    $authorCell.find('img').remove()
+    const author = $authorCell.text().trim() || null
 
     // ── 조회수 (축약형 처리: 73만, 1백만) ──────────────────────
     const viewRaw = $tr.find('td.m_no').first().text().trim()

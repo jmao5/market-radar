@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 // 로그인 없이 접근 가능한 경로
 const PUBLIC_PATHS = ['/', '/login']
-const PUBLIC_PREFIXES = ['/api/', '/_next/', '/favicon', '/icons', '/images', '/manifest', '/posts/']
+const PUBLIC_PREFIXES = ['/api/', '/_next/', '/favicon', '/icons', '/images', '/manifest', '/posts/', '/users', '/search']
 
 function isPublic(pathname: string): boolean {
   if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) return true

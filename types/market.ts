@@ -97,3 +97,20 @@ export interface DetailScrapeResult {
   comments_upserted: number
   errors: string[]
 }
+
+// ── 관심 작성자 ───────────────────────────────────────────────
+
+export interface WatchedAuthor {
+  id: string
+  source: string           // 'fmkorea_stock'
+  author: string
+  last_scraped_at: string | null
+  created_at: string
+}
+
+export interface AuthorScrapeResult {
+  success: boolean
+  author: string
+  inserted: number
+  errors: string[]
+}

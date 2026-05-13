@@ -1,16 +1,15 @@
 'use client'
 
 import Link from 'next/link'
-import { BiHomeAlt, BiSearch, BiUserCircle, BiBookmark } from 'react-icons/bi'
+import { BiHomeAlt, BiSearch, BiBookmark, BiUserCircle } from 'react-icons/bi'
 import { usePathname } from 'next/navigation'
 import { m, AnimatePresence } from 'framer-motion'
 
-// ── TODO: 앱에 맞게 네비게이션 항목을 수정하세요 ──────────
 const NAV_ITEMS = [
-  { label: '홈',    href: '/',        icon: BiHomeAlt,    activePath: '/' },
-  { label: '검색',  href: '/search',  icon: BiSearch,     activePath: '/search' },
-  { label: '저장',  href: '/my/favorites', icon: BiBookmark, activePath: '/my/favorites' },
-  { label: '마이',  href: '/my',      icon: BiUserCircle, activePath: '/my' },
+  { label: '홈',    href: '/',             icon: BiHomeAlt,    activePath: '/' },
+  { label: '검색',  href: '/search',       icon: BiSearch,     activePath: '/search' },
+  { label: '저장',  href: '/my/favorites', icon: BiBookmark,   activePath: '/my/favorites' },
+  { label: '마이',  href: '/my',           icon: BiUserCircle, activePath: '/my' },
 ]
 
 export default function Navbar() {

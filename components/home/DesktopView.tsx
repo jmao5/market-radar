@@ -1,8 +1,9 @@
 import dayjs from 'dayjs'
-import { BiRefresh, BiSearch, BiTime, BiShow, BiChevronLeft, BiChevronRight } from 'react-icons/bi'
+import { BiRefresh, BiSearch, BiTime, BiShow, BiChevronLeft, BiChevronRight, BiUserCheck } from 'react-icons/bi'
 import { useMarketData } from '@/hooks/useMarketData'
 import { MarketIndexCard, MarketIndexSkeleton } from './MarketIndexCard'
 import { DesktopPostRow } from './PostRow'
+import Link from 'next/link'
 
 export function DesktopView() {
   const {
@@ -48,11 +49,19 @@ export function DesktopView() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5 text-[12px] font-medium text-[var(--text-sub)] bg-[var(--bg-sub)] px-3 py-1.5 rounded-full border border-[var(--border-subtle)]">
             <BiTime size={14} className="text-[var(--text-muted)]" />
             {dayjs(lastUpdated).format('MM/DD HH:mm')} 기준
           </div>
+          {/* 관심 작성자 버튼 */}
+          <Link
+            href="/users"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-[13px] font-semibold transition-all active:scale-[0.95] bg-[var(--bg-sub)] hover:bg-[var(--bg-card)] text-[var(--text-sub)] border border-[var(--border-main)] shadow-sm"
+          >
+            <BiUserCheck size={16} />
+            관심 작성자
+          </Link>
           <button
             onClick={handleRefresh}
             disabled={isRefreshing}

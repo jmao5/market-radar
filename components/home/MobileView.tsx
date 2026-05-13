@@ -1,10 +1,11 @@
 import dayjs from 'dayjs'
-import { BiRefresh, BiSearch } from 'react-icons/bi'
+import { BiRefresh, BiSearch, BiUserCheck } from 'react-icons/bi'
 import { useMarketData } from '@/hooks/useMarketData'
 import { MarketIndexCard, MarketIndexSkeleton } from './MarketIndexCard'
 import { MobilePostRow, PostSkeleton } from './PostRow'
 import { useInView } from 'react-intersection-observer'
 import { useEffect } from 'react'
+import Link from 'next/link'
 
 export function MobileView() {
   const {
@@ -35,10 +36,19 @@ export function MobileView() {
       {/* 헤더 */}
       <div className="flex items-center justify-between px-5 py-3.5 sticky top-0 z-10 backdrop-blur-md bg-[var(--bg-main)]/80 border-b border-[var(--border-main)]">
         <h1 className="text-[17px] font-bold text-[var(--text-main)] tracking-tight">📡 Market Radar</h1>
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
           <span className="text-[11px] font-medium text-[var(--text-muted)]">
             {dayjs(lastUpdated).format('HH:mm')}
           </span>
+          {/* 관심 작성자 버튼 */}
+          <Link
+            href="/users"
+            className="flex items-center justify-center w-8 h-8 rounded-full bg-[var(--bg-sub)] border border-[var(--border-main)] transition-opacity active:opacity-60"
+            aria-label="관심 작성자"
+            title="관심 작성자"
+          >
+            <BiUserCheck size={16} style={{ color: 'var(--text-sub)' }} />
+          </Link>
           <button
             onClick={handleRefresh}
             disabled={isRefreshing}
