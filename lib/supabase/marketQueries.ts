@@ -6,7 +6,7 @@
  */
 
 import { createClient } from './client'
-import type { ForumPost, ForumComment, MarketIndex, StockNews } from '@/types/market'
+import type { ForumPost, ForumPostSummary, ForumComment, MarketIndex, StockNews } from '@/types/market'
 
 // ── 포럼 게시글 ───────────────────────────────────────────────
 
@@ -25,7 +25,7 @@ export async function getForumPosts(options?: {
 
   let query = supabase
     .from('forum_posts')
-    .select('id, source, post_id, title, author, url, view_count, comment_count, thumbnail_url, scraped_at, created_at', { count: 'exact' })
+    .select('id, source, post_id, title, author, url, category, view_count, comment_count, vote_count, thumbnail_url, scraped_at, created_at', { count: 'exact' })
     .order('created_at', { ascending: false })
 
   if (source) query = query.eq('source', source)
@@ -51,7 +51,7 @@ export async function getForumPosts(options?: {
     nextCursor = hasMore ? items[items.length - 1].created_at : null
   }
 
-  return { items: items as Omit<ForumPost, 'body_text'>[], nextCursor, totalCount: count ?? 0 }
+  return { items: items as ForumPostSummary[], nextCursor, totalCount: count ?? 0 }
 }
 
 /**
@@ -64,14 +64,14 @@ export async function searchForumPosts(options: {
   limit?: number
   cursor?: string | null
   page?: number
-}): Promise<{ items: Omit<ForumPost, 'body_text'>[]; nextCursor: string | null; totalCount: number }> {
+}): Promise<{ items: ForumPostSummary[]; nextCursor: string | null; totalCount: number }> {
   const { query: searchQuery, source = 'fmkorea_stock', limit = 30, cursor, page } = options
   const supabase = createClient()
   const q = `%${searchQuery}%`
 
   let query = supabase
     .from('forum_posts')
-    .select('id, source, post_id, title, author, url, category, view_count, comment_count, thumbnail_url, scraped_at, created_at', { count: 'exact' })
+    .select('id, source, post_id, title, author, url, category, view_count, comment_count, vote_count, thumbnail_url, scraped_at, created_at', { count: 'exact' })
     .eq('source', source)
     .or(`title.ilike.${q},body_text.ilike.${q},author.ilike.${q}`)
     .order('created_at', { ascending: false })
@@ -97,7 +97,7 @@ export async function searchForumPosts(options: {
     nextCursor = hasMore ? items[items.length - 1].created_at : null
   }
 
-  return { items: items as Omit<ForumPost, 'body_text'>[], nextCursor, totalCount: count ?? 0 }
+  return { items: items as ForumPostSummary[], nextCursor, totalCount: count ?? 0 }
 }
 
 /**

@@ -1,4 +1,4 @@
-import type { ForumPost } from '@/types/market'
+import type { ForumPost, ForumPostSummary } from '@/types/market'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import 'dayjs/locale/ko'
@@ -10,12 +10,12 @@ dayjs.extend(relativeTime)
 dayjs.locale('ko')
 
 interface MobilePostRowProps {
-  post: Omit<ForumPost, 'body_text'>
+  post: ForumPostSummary
   onAuthorClick?: (author: string) => void
 }
 
 interface DesktopPostRowProps {
-  post: Omit<ForumPost, 'body_text'>
+  post: ForumPostSummary
   index: number
   onAuthorClick?: (author: string) => void
 }

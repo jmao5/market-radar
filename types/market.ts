@@ -15,6 +15,7 @@ export interface ForumPost {
   comment_count: number | null
   vote_count: number
   thumbnail_url: string | null
+  category: string | null         // 추가: 카테고리 필드
   body_text: string | null       // 검색용 plain text
   body_html: string | null       // 렌더링용 HTML (이미지/영상 포함)
   scraped_at: string
@@ -22,7 +23,15 @@ export interface ForumPost {
   created_at: string
 }
 
-export type ForumPostSummary = Omit<ForumPost, 'body_text' | 'body_html'>
+export type ForumPostSummary = Omit<ForumPost, 'body_text' | 'body_html' | 'detail_scraped_at'>
+
+export interface WatchedAuthor {
+  id: string
+  author: string
+  source: string
+  last_scraped_at: string | null   // 추가: 마지막 수집 시간
+  created_at: string
+}
 
 // ── 댓글 ─────────────────────────────────────────────────────
 
@@ -76,6 +85,13 @@ export interface ScrapeResult {
   errors: string[]
   source: string
   scraped_at: string
+}
+
+export interface AuthorScrapeResult {
+  success: boolean
+  author: string
+  inserted: number
+  errors: string[]
 }
 
 export type MarketDirection = 'up' | 'down' | 'flat'
