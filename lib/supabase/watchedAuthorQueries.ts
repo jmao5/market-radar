@@ -1,11 +1,13 @@
 /**
  * lib/supabase/watchedAuthorQueries.ts
- *
- * 관심 작성자 관련 Supabase 쿼리 함수
  */
 
 import { createClient } from './client'
 import type { WatchedAuthor, ForumPostSummary } from '@/types/market'
+
+// body_html, body_text 제외한 목록용 컬럼 (marketQueries와 동일)
+const POST_LIST_SELECT =
+  'id, source, post_id, title, author, url, category, view_count, comment_count, vote_count, thumbnail_url, posted_at, scraped_at, detail_scraped_at, created_at'
 
 // ── 관심 작성자 CRUD ──────────────────────────────────────────
 
@@ -47,6 +49,7 @@ export async function removeWatchedAuthor(
 }
 
 // ── 관심 작성자 게시글 피드 ───────────────────────────────────
+// 정렬: posted_at 우선(실제 작성 시간), null이면 scraped_at 폴백
 
 export async function getWatchedAuthorPosts(options?: {
   authors?: string[]
@@ -59,11 +62,9 @@ export async function getWatchedAuthorPosts(options?: {
 
   let query = supabase
     .from('forum_posts')
-    .select(
-      'id, source, post_id, title, author, url, category, view_count, comment_count, thumbnail_url, scraped_at, created_at',
-      { count: 'exact' }
-    )
-    .order('created_at', { ascending: false })
+    .select(POST_LIST_SELECT, { count: 'exact' })
+    .order('posted_at', { ascending: false, nullsFirst: false })
+    .order('scraped_at', { ascending: false })
 
   if (authors && authors.length > 0) {
     query = query.in('author', authors)
@@ -73,7 +74,7 @@ export async function getWatchedAuthorPosts(options?: {
     const from = (page - 1) * limit
     query = query.range(from, from + limit - 1)
   } else {
-    if (cursor) query = query.lt('created_at', cursor)
+    if (cursor) query = query.lt('posted_at', cursor)
     query = query.limit(limit + 1)
   }
 
@@ -86,7 +87,9 @@ export async function getWatchedAuthorPosts(options?: {
   if (page === undefined) {
     const hasMore = items.length > limit
     items = hasMore ? items.slice(0, limit) : items
-    nextCursor = hasMore ? items[items.length - 1].created_at : null
+    nextCursor = hasMore
+      ? (items[items.length - 1].posted_at ?? items[items.length - 1].scraped_at)
+      : null
   }
 
   return { items, nextCursor, totalCount: count ?? 0 }

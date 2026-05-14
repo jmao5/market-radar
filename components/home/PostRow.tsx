@@ -1,10 +1,9 @@
-import type { ForumPost, ForumPostSummary } from '@/types/market'
+import type { ForumPostSummary } from '@/types/market'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import 'dayjs/locale/ko'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { BiShow } from 'react-icons/bi'
 
 dayjs.extend(relativeTime)
 dayjs.locale('ko')
@@ -20,8 +19,13 @@ interface DesktopPostRowProps {
   onAuthorClick?: (author: string) => void
 }
 
+// posted_at 우선, 없으면 scraped_at 폴백
+function displayTime(post: ForumPostSummary): string {
+  const ts = post.posted_at ?? post.scraped_at
+  return dayjs(ts).fromNow()
+}
+
 // ── 모바일: 게시글 행 ─────────────────────────────────────────
-// 외부 래퍼를 <button> → <Link>로 교체: <button> 중첩 방지 (HTML 스펙 위반)
 export function MobilePostRow({ post, onAuthorClick }: MobilePostRowProps) {
   return (
     <Link
@@ -43,7 +47,11 @@ export function MobilePostRow({ post, onAuthorClick }: MobilePostRowProps) {
                   onAuthorClick(post.author!)
                 }
               }}
-              className={`font-medium ${onAuthorClick ? 'text-[var(--text-main)] hover:text-[var(--point-color)] transition-colors' : 'text-[var(--text-sub)]'}`}
+              className={`font-medium ${
+                onAuthorClick
+                  ? 'text-[var(--text-main)] hover:text-[var(--point-color)] transition-colors'
+                  : 'text-[var(--text-sub)]'
+              }`}
             >
               {post.author}
             </button>
@@ -58,9 +66,7 @@ export function MobilePostRow({ post, onAuthorClick }: MobilePostRowProps) {
               [{post.comment_count}]
             </span>
           )}
-          <span className="text-[var(--text-muted)]">
-            {dayjs(post.scraped_at).fromNow()}
-          </span>
+          <span className="text-[var(--text-muted)]">{displayTime(post)}</span>
         </div>
       </div>
     </Link>
@@ -98,7 +104,11 @@ export function DesktopPostRow({ post, index, onAuthorClick }: DesktopPostRowPro
                 onAuthorClick(post.author!)
               }
             }}
-            className={onAuthorClick ? 'hover:text-[var(--point-color)] transition-colors font-medium text-[var(--text-main)]' : ''}
+            className={
+              onAuthorClick
+                ? 'hover:text-[var(--point-color)] transition-colors font-medium text-[var(--text-main)]'
+                : ''
+            }
           >
             {post.author}
           </button>
@@ -110,7 +120,7 @@ export function DesktopPostRow({ post, index, onAuthorClick }: DesktopPostRowPro
         {post.view_count != null ? post.view_count.toLocaleString() : '—'}
       </td>
       <td className="py-3.5 pr-6 text-[12px] w-24 text-right whitespace-nowrap text-[var(--text-muted)]">
-        {dayjs(post.scraped_at).fromNow()}
+        {displayTime(post)}
       </td>
     </tr>
   )

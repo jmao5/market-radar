@@ -37,8 +37,8 @@ export function startScheduler() {
   }
 
   console.log('[Scheduler] 로컬 스케줄러 시작')
-  console.log('  · 목록 스크래핑: 5분 간격')
-  console.log('  · 상세 스크래핑: 3분 간격\n')
+  console.log('  · 목록 스크래핑: 1분 간격')
+  console.log('  · 상세 스크래핑: 1분 간격\n')
 
   // 서버 완전 기동 후 10초 뒤 첫 실행
   setTimeout(async () => {
@@ -48,7 +48,7 @@ export function startScheduler() {
     }, 3000)
 
     // 이후 반복
-    setInterval(() => runScrape('목록', `${BASE_URL}/api/cron/scrape`), 5 * 60 * 1000)
-    setInterval(() => runScrape('상세', `${BASE_URL}/api/cron/scrape-detail?limit=10`), 3 * 60 * 1000)
+    setInterval(() => runScrape('목록', `${BASE_URL}/api/cron/scrape`), 1 * 60 * 1000)
+    setInterval(() => runScrape('상세', `${BASE_URL}/api/cron/scrape-detail?limit=10`), 1 * 60 * 1000)
   }, 10_000)
 }

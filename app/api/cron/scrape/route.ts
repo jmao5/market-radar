@@ -2,12 +2,6 @@
  * app/api/cron/scrape/route.ts
  *
  * 주식 갤러리 목록 스크래핑 API
- *
- * 호출: GET /api/cron/scrape
- * 보호:
- *   - 로컬: 인증 없이 허용
- *   - 프로덕션(Vercel Cron): Authorization 헤더 자동 검증
- *   - 프로덕션(외부 호출): x-cron-secret 헤더 검증
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -15,14 +9,12 @@ import * as cheerio from 'cheerio'
 import { createClient } from '@supabase/supabase-js'
 import type { ScrapeResult } from '@/types/market'
 
-// ── Supabase Admin 클라이언트 (service_role — RLS 우회) ────────
 function getAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY!
   return createClient(url, key, { auth: { persistSession: false } })
 }
 
-// ── 스크래핑 대상 설정 ────────────────────────────────────────
 const TARGETS = [
   {
     source: 'fmkorea_stock',
@@ -31,14 +23,38 @@ const TARGETS = [
   },
 ]
 
-// ── 주식 갤러리 파서 ──────────────────────────────
-// 실제 HTML 구조:
-//   table.bd_lst > tbody > tr  (notice 클래스 = 공지)
-//   td.cate  : 카테고리
-//   td.title > a[href] : 제목 링크 (href="/9820024410")
-//   td.title > a.replyNum : 댓글 수
-//   td.author .member_plate : 닉네임
-//   td.m_no (첫 번째) : 조회수
+// ── 에펨코리아 게시 시간 파서 (KST → UTC ISO) ─────────────────
+// fmkorea td.time 형식:
+//   - "13:20"     오늘 게시글 (HH:MM, KST)
+//   - "23.11.30"  과거 게시글 (YY.MM.DD, KST 자정)
+export function parsePostedAt(timeStr: string): string | null {
+  const t = timeStr.trim()
+  if (!t) return null
+
+  // HH:MM — 오늘 게시글
+  if (/^\d{1,2}:\d{2}$/.test(t)) {
+    const [h, m] = t.split(':').map(Number)
+    // 서버 현재 시각을 KST 기준 날짜로 변환
+    const nowUtc = new Date()
+    const kstOffset = 9 * 60 * 60 * 1000
+    const kstNow = new Date(nowUtc.getTime() + kstOffset)
+    const kstDate = kstNow.toISOString().slice(0, 10) // YYYY-MM-DD (KST)
+    // KST HH:MM → UTC ISO
+    return new Date(
+      `${kstDate}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00+09:00`
+    ).toISOString()
+  }
+
+  // YY.MM.DD — 과거 게시글
+  if (/^\d{2}\.\d{2}\.\d{2}$/.test(t)) {
+    const [yy, mm, dd] = t.split('.').map(Number)
+    return new Date(
+      `${2000 + yy}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}T00:00:00+09:00`
+    ).toISOString()
+  }
+
+  return null
+}
 
 interface RawPost {
   post_id: string
@@ -49,7 +65,7 @@ interface RawPost {
   comment_count: number | null
   thumbnail_url: string | null
   category: string | null
-  posted_at: string | null   // 원본 게시 시간 (ISO 8601)
+  posted_at: string | null
 }
 
 function parseFmkoreaStock(html: string): RawPost[] {
@@ -58,15 +74,11 @@ function parseFmkoreaStock(html: string): RawPost[] {
 
   $('table.bd_lst tbody tr').each((_, el) => {
     const $tr = $(el)
-
-    // 공지 행 제외
     if ($tr.hasClass('notice')) return
 
     const $titleTd = $tr.find('td.title')
     if ($titleTd.length === 0) return
 
-    // ── 제목 링크 ──────────────────────────────────────────────
-    // ── 카테고리 ────────────────────────────────────────────────
     const category = $tr.find('td.cate a').first().text().trim() || null
 
     const $titleLink = $titleTd.find('a').first()
@@ -78,50 +90,22 @@ function parseFmkoreaStock(html: string): RawPost[] {
     const postIdMatch = href.match(/\/(\d+)(?:\?.*)?$/)
     const post_id = postIdMatch ? postIdMatch[1] : href
 
-    // ── 댓글 수 ────────────────────────────────────────────────
     const replyText = $titleTd.find('a.replyNum').first().text().trim()
     const comment_count = replyText ? parseInt(replyText.replace(/[^0-9]/g, ''), 10) || null : null
 
-    // ── 작성자 (레벨 이미지 alt 텍스트 제외, 닉네임만) ────────────
-    const $authorCell = $tr.find('td.author .member_plate').clone()
-    $authorCell.find('img').remove()
-    const author = $authorCell.text().trim() || null
+    const author = $tr.find('td.author .member_plate').clone().find('img').remove().end().text().trim() || null
 
-    // ── 조회수 (축약형 처리: 73만, 1백만) ──────────────────────
     const viewRaw = $tr.find('td.m_no').first().text().trim()
     let view_count: number | null = null
     if (viewRaw) {
-      if (viewRaw.includes('백만')) {
-        view_count = Math.round(parseFloat(viewRaw) * 1_000_000)
-      } else if (viewRaw.includes('만')) {
-        view_count = Math.round(parseFloat(viewRaw) * 10_000)
-      } else {
-        const n = parseInt(viewRaw.replace(/[^0-9]/g, ''), 10)
-        view_count = isNaN(n) ? null : n
-      }
+      if (viewRaw.includes('백만')) view_count = Math.round(parseFloat(viewRaw) * 1_000_000)
+      else if (viewRaw.includes('만')) view_count = Math.round(parseFloat(viewRaw) * 10_000)
+      else { const n = parseInt(viewRaw.replace(/[^0-9]/g, ''), 10); view_count = isNaN(n) ? null : n }
     }
 
-    // ── 작성 시간 ── td.time: "17:29" 또는 "05.12" 또는 "2025.05.12" 형태
-    const timeRaw = $tr.find('td.time').first().text().trim()
-    let posted_at: string | null = null
-    if (timeRaw) {
-      const now = new Date()
-      if (/^\d{1,2}:\d{2}$/.test(timeRaw)) {
-        // "17:29" → 오늘 날짜 + 시간
-        const [h, m] = timeRaw.split(':').map(Number)
-        const d = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0)
-        posted_at = d.toISOString()
-      } else if (/^\d{2}\.\d{2}$/.test(timeRaw)) {
-        // "05.12" → 올해 + 월.일
-        const [mon, day] = timeRaw.split('.').map(Number)
-        const d = new Date(now.getFullYear(), mon - 1, day)
-        posted_at = d.toISOString()
-      } else if (/^\d{4}\.\d{2}\.\d{2}$/.test(timeRaw)) {
-        // "2025.05.12"
-        const [y, mon, day] = timeRaw.split('.').map(Number)
-        posted_at = new Date(y, mon - 1, day).toISOString()
-      }
-    }
+    // ── 원본 게시 시간 파싱 ──────────────────────────────────
+    const timeRaw = $tr.find('td.time').text().trim()
+    const posted_at = parsePostedAt(timeRaw)
 
     posts.push({ post_id, title, author, url, view_count, comment_count, thumbnail_url: null, category, posted_at })
   })
@@ -129,7 +113,6 @@ function parseFmkoreaStock(html: string): RawPost[] {
   return posts
 }
 
-// ── 단일 타겟 스크래핑 실행 ───────────────────────────────────
 async function scrapeTarget(target: (typeof TARGETS)[number]): Promise<ScrapeResult> {
   const result: ScrapeResult = {
     success: false,
@@ -143,8 +126,7 @@ async function scrapeTarget(target: (typeof TARGETS)[number]): Promise<ScrapeRes
   try {
     const res = await fetch(target.url, {
       headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36',
         'Accept-Language': 'ko-KR,ko;q=0.9',
         Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
       },
@@ -177,8 +159,8 @@ async function scrapeTarget(target: (typeof TARGETS)[number]): Promise<ScrapeRes
       comment_count: p.comment_count,
       thumbnail_url: p.thumbnail_url,
       category: p.category,
+      posted_at: p.posted_at,
       scraped_at: now,
-      ...(p.posted_at ? { created_at: p.posted_at } : {}),
     }))
 
     const { error } = await supabase
@@ -199,33 +181,24 @@ async function scrapeTarget(target: (typeof TARGETS)[number]): Promise<ScrapeRes
   return result
 }
 
-// ── Route Handler ─────────────────────────────────────────────
 export async function GET(req: NextRequest) {
   const isProd = process.env.NODE_ENV === 'production'
 
   if (isProd) {
-    // Vercel Cron은 Authorization: Bearer <CRON_SECRET> 헤더를 자동으로 붙임
     const authHeader = req.headers.get('authorization')
     const cronSecret = req.headers.get('x-cron-secret')
-
     const validVercel = authHeader === `Bearer ${process.env.CRON_SECRET}`
     const validManual = cronSecret === process.env.CRON_SECRET
-
     if (!validVercel && !validManual) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
   }
 
   const results = await Promise.allSettled(TARGETS.map(scrapeTarget))
-
   const summary = results.map((r) =>
     r.status === 'fulfilled' ? r.value : { success: false, error: String(r.reason) }
   )
-
   const allSuccess = summary.every((s) => 'success' in s && s.success)
 
-  return NextResponse.json(
-    { ok: allSuccess, results: summary },
-    { status: allSuccess ? 200 : 207 }
-  )
+  return NextResponse.json({ ok: allSuccess, results: summary }, { status: allSuccess ? 200 : 207 })
 }
