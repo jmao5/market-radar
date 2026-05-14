@@ -25,7 +25,14 @@ const FETCH_HEADERS = {
 }
 
 function buildAuthorSearchUrl(author: string, page = 1): string {
-  return `https://www.fmkorea.com/index.php?mid=stock&act=IS&is_keyword=${encodeURIComponent(author)}&where=member_name&page=${page}`
+  const params = new URLSearchParams({
+    mid: 'stock',
+    category: '',
+    search_keyword: author,
+    search_target: 'nick_name',
+    ...(page > 1 ? { page: String(page) } : {}),
+  })
+  return `https://www.fmkorea.com/search.php?${params.toString()}`
 }
 
 interface RawPost {
@@ -51,14 +58,18 @@ function parsePostList(html: string): RawPost[] {
     if ($titleTd.length === 0) return
 
     const category = $tr.find('td.cate a').first().text().trim() || null
-    const $titleLink = $titleTd.find('a').first()
-    const title = $titleLink.text().trim()
+    const $titleLink = $titleTd.find('a.hx, a[href*="document_srl"]').first()
+    const title = $titleLink.clone().find('span, b').remove().end().text().trim()
     const href = $titleLink.attr('href') || ''
     if (!title || !href) return
 
-    const url = href.startsWith('http') ? href : `https://www.fmkorea.com${href}`
-    const postIdMatch = href.match(/\/(\d+)(?:\?.*)?$/)
-    const post_id = postIdMatch ? postIdMatch[1] : href
+    // document_srl 파라미터 우선, 없으면 경로 끝 숫자
+    const dsrlMatch = href.match(/[?&]document_srl=(\d+)/)
+    const pathMatch = href.match(/\/(\d+)(?:[?#]|$)/)
+    const post_id = dsrlMatch?.[1] ?? pathMatch?.[1]
+    if (!post_id) return
+
+    const url = `https://www.fmkorea.com/${post_id}`
 
     const replyText = $titleTd.find('a.replyNum').first().text().trim()
     const comment_count = replyText ? parseInt(replyText.replace(/[^0-9]/g, ''), 10) || null : null
