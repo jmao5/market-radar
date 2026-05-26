@@ -363,14 +363,19 @@ export default function UsersClient() {
       const res = await fetch('/api/cron/scrape-author', { cache: 'no-store' })
       const json = await res.json()
       toast.dismiss(loadingToast)
-      if (json.message) {
+      if (json.isRateLimited) {
+        toast.error('에펨코리아 요청 제한(430) 상태입니다. 잠시 후 다시 시도해 주세요.', { duration: 5000 })
+      } else if (json.message) {
         toast('수집할 작성자가 없어요', { icon: 'ℹ️' })
+      } else if (!json.ok) {
+        const failedCount = json.results?.filter((r: any) => !r.success).length ?? 0
+        toast.error(`일부 작성자 수집 실패 (${failedCount}명 차단/실패)`)
       } else {
         const inserted = json.total_inserted ?? 0
         toast.success(`완료 — ${inserted}건 저장`)
-        queryClient.invalidateQueries({ queryKey: watchedAuthorQueryKeys.all() })
-        queryClient.invalidateQueries({ queryKey: watchedAuthorQueryKeys.posts(authorNames) })
       }
+      queryClient.invalidateQueries({ queryKey: watchedAuthorQueryKeys.all() })
+      queryClient.invalidateQueries({ queryKey: watchedAuthorQueryKeys.posts(authorNames) })
     } catch {
       toast.dismiss(loadingToast)
       toast.error('서버 연결 실패')

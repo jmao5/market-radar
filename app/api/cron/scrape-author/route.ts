@@ -103,6 +103,10 @@ async function scrapeAuthor(author: string, source: string, maxPages = 3): Promi
       const url = buildAuthorSearchUrl(author, page)
       const res = await fetch(url, { headers: FETCH_HEADERS, cache: 'no-store' })
 
+      if (res.status === 430) {
+        result.errors.push(`HTTP 430 (page ${page})`)
+        break
+      }
       if (!res.ok) { result.errors.push(`HTTP ${res.status} (page ${page})`); break }
 
       const html = await res.text()
@@ -110,7 +114,7 @@ async function scrapeAuthor(author: string, source: string, maxPages = 3): Promi
       if (posts.length === 0) break
 
       allPosts.push(...posts)
-      await new Promise((r) => setTimeout(r, 400))
+      await new Promise((r) => setTimeout(r, 600 + Math.random() * 400)) // 무작위 딜레이로 차단 방지
     }
 
     if (allPosts.length === 0) { result.success = true; return result }
@@ -179,24 +183,44 @@ export async function GET(req: NextRequest) {
   }
 
   const results: AuthorScrapeResult[] = []
+  let isRateLimited = false
+
   for (const wa of watched) {
+    if (isRateLimited) {
+      results.push({
+        success: false,
+        author: wa.author,
+        inserted: 0,
+        errors: ['IP가 임시 차단되었습니다 (430)'],
+      })
+      continue
+    }
+
     const r = await scrapeAuthor(wa.author, wa.source)
     results.push(r)
-    await new Promise((resolve) => setTimeout(resolve, 600))
+
+    if (r.errors.some((e) => e.includes('HTTP 430'))) {
+      isRateLimited = true
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 800 + Math.random() * 400)) // 차단 예방 딜레이
   }
 
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
   try {
-    await fetch(`${baseUrl}/api/cron/scrape-detail?limit=20`, {
-      headers: { 'x-cron-secret': process.env.CRON_SECRET ?? '' },
-      cache: 'no-store',
-    })
+    if (!isRateLimited) {
+      await fetch(`${baseUrl}/api/cron/scrape-detail?limit=20`, {
+        headers: { 'x-cron-secret': process.env.CRON_SECRET ?? '' },
+        cache: 'no-store',
+      })
+    }
   } catch { /* 상세 스크래핑 실패해도 전체 결과는 반환 */ }
 
   return NextResponse.json({
-    ok: results.every((r) => r.success),
+    ok: results.every((r) => r.success) && !isRateLimited,
     authors_processed: results.length,
     total_inserted: results.reduce((sum, r) => sum + r.inserted, 0),
+    isRateLimited,
     results,
   })
 }
