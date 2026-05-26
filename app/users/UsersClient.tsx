@@ -173,6 +173,7 @@ function FeedView({ authors, onSelectAuthor }: { authors: string[]; onSelectAuth
   const [mode, setMode] = useState<FeedMode>('grouped')
   const { ref, inView } = useInView()
 
+  // 전체 작성자 기준의 시간순 피드 쿼리 (작성자별 정렬 순서를 판단하기 위해 항상 활성화)
   const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
     queryKey: [...watchedAuthorQueryKeys.posts(authors), 'timeline'],
     queryFn: ({ pageParam }) =>
@@ -180,14 +181,37 @@ function FeedView({ authors, onSelectAuthor }: { authors: string[]; onSelectAuth
     initialPageParam: null as string | null,
     getNextPageParam: (last) => last.nextCursor,
     staleTime: 1000 * 60 * 3,
-    enabled: authors.length > 0 && mode === 'timeline',
+    enabled: authors.length > 0,
   })
 
   useEffect(() => {
-    if (inView && hasNextPage && !isFetchingNextPage) fetchNextPage()
-  }, [inView, hasNextPage, isFetchingNextPage, fetchNextPage])
+    if (inView && hasNextPage && !isFetchingNextPage && mode === 'timeline') fetchNextPage()
+  }, [inView, hasNextPage, isFetchingNextPage, fetchNextPage, mode])
 
   const posts = data?.pages.flatMap((p) => p.items) ?? []
+
+  // 최근 게시글 등록 시각 기준으로 작성자들을 정렬 (시간순 나열)
+  const sortedAuthors = (() => {
+    const authorOrder: string[] = []
+    const seen = new Set<string>()
+
+    // 타임라인 포스트를 위에서부터 훑으며 나타나는 작성자 순으로 수집
+    for (const post of posts) {
+      if (post.author && authors.includes(post.author) && !seen.has(post.author)) {
+        seen.add(post.author)
+        authorOrder.push(post.author)
+      }
+    }
+
+    // 아직 포스트가 없거나 타임라인에 잡히지 않은 작성자들은 기존 추가된 순서대로 끝에 배치
+    for (const author of authors) {
+      if (!seen.has(author)) {
+        authorOrder.push(author)
+      }
+    }
+
+    return authorOrder
+  })()
 
   if (authors.length === 0) {
     return (
@@ -225,7 +249,7 @@ function FeedView({ authors, onSelectAuthor }: { authors: string[]; onSelectAuth
       </div>
 
       {mode === 'grouped' ? (
-        authors.map((a) => <AuthorSection key={a} author={a} onSelect={onSelectAuthor} />)
+        sortedAuthors.map((a) => <AuthorSection key={a} author={a} onSelect={onSelectAuthor} />)
       ) : (
         <>
           {isLoading
