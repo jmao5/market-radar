@@ -5,8 +5,23 @@
       "schedule": "*/1 * * * *"
     },
     {
-      "path": "/api/cron/scrape-detail?limit=10",
+      "path": "/api/cron/scrape-detail?limit=20",
       "schedule": "*/1 * * * *"
+    },
+    {
+      "path": "/api/cron/scrape-author",
+      "schedule": "*/15 * * * *"
     }
-  ]
+  ],
+  "functions": {
+    "app/api/cron/scrape-detail/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/cron/scrape-author/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/cron/scrape/route.ts": {
+      "maxDuration": 30
+    }
+  }
 }
