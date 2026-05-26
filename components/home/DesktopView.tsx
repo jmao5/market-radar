@@ -20,6 +20,8 @@ export function DesktopView() {
     handleRefresh,
     searchQuery,
     setSearchQuery,
+    handleSearch,
+    handleInstantSearch,
   } = useMarketData({ viewType: 'desktop' })
 
   const totalPages = Math.max(1, Math.ceil(totalCount / limit))
@@ -109,8 +111,20 @@ export function DesktopView() {
             </div>
 
             {/* 검색창 */}
-            <div className="relative flex items-center w-72 group">
-              <BiSearch className="absolute left-3.5 text-[var(--text-muted)] group-focus-within:text-[var(--point-color)] transition-colors" size={16} />
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                handleSearch()
+              }}
+              className="relative flex items-center w-72 group"
+            >
+              <button
+                type="submit"
+                className="absolute left-3.5 text-[var(--text-muted)] group-focus-within:text-[var(--point-color)] transition-colors hover:text-[var(--point-color)] cursor-pointer"
+                style={{ background: 'none', border: 'none', padding: 0 }}
+              >
+                <BiSearch size={16} />
+              </button>
               <input
                 type="text"
                 placeholder="제목, 본문, 작성자 검색..."
@@ -118,7 +132,7 @@ export function DesktopView() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full text-[13px] outline-none pl-10 pr-4 py-2 rounded-xl transition-all focus:border-[var(--point-color)] focus:ring-2 focus:ring-[var(--point-ring)] bg-[var(--bg-card)] text-[var(--text-main)] border border-[var(--border-main)] shadow-sm"
               />
-            </div>
+            </form>
           </div>
 
           <div className="flex-1 overflow-hidden flex flex-col rounded-2xl bg-[var(--bg-card)] border border-[var(--border-main)] shadow-sm">
@@ -156,7 +170,7 @@ export function DesktopView() {
                       </tr>
                     ))
                     : posts.map((post, i) => (
-                      <DesktopPostRow key={post.id} post={post} index={i} onAuthorClick={setSearchQuery} />
+                      <DesktopPostRow key={post.id} post={post} index={i} onAuthorClick={handleInstantSearch} />
                     ))}
                 </tbody>
               </table>

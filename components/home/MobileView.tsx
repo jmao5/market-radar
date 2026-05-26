@@ -21,6 +21,8 @@ export function MobileView() {
     handleRefresh,
     searchQuery,
     setSearchQuery,
+    handleSearch,
+    handleInstantSearch,
   } = useMarketData({ viewType: 'mobile' })
 
   const { ref, inView } = useInView()
@@ -93,8 +95,20 @@ export function MobileView() {
 
         {/* 검색창 */}
         <div className="px-5 py-3 border-b border-[var(--border-subtle)] bg-[var(--bg-main)]">
-          <div className="relative flex items-center group">
-            <BiSearch className="absolute left-3.5 text-[var(--text-muted)] group-focus-within:text-[var(--point-color)] transition-colors" size={18} />
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              handleSearch()
+            }}
+            className="relative flex items-center group"
+          >
+            <button
+              type="submit"
+              className="absolute left-3.5 text-[var(--text-muted)] group-focus-within:text-[var(--point-color)] transition-colors hover:text-[var(--point-color)] cursor-pointer"
+              style={{ background: 'none', border: 'none', padding: 0 }}
+            >
+              <BiSearch size={18} />
+            </button>
             <input
               type="text"
               placeholder="제목, 본문, 작성자 검색..."
@@ -102,12 +116,12 @@ export function MobileView() {
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-[var(--bg-sub)] text-[14px] text-[var(--text-main)] outline-none pl-10 pr-4 py-2.5 rounded-xl border border-[var(--border-main)] focus:border-[var(--point-color)] focus:ring-2 focus:ring-[var(--point-ring)] transition-all shadow-sm"
             />
-          </div>
+          </form>
         </div>
 
         {postsLoading
           ? [1, 2, 3, 4, 5, 6].map((i) => <PostSkeleton key={i} />)
-          : posts.map((post) => <MobilePostRow key={post.id} post={post} onAuthorClick={setSearchQuery} />)}
+          : posts.map((post) => <MobilePostRow key={post.id} post={post} onAuthorClick={handleInstantSearch} />)}
 
         {/* 무한 스크롤 옵저버 */}
         {hasNextPage && (

@@ -24,29 +24,50 @@ export function useMarketData({ viewType }: { viewType: 'mobile' | 'desktop' }) 
   const pathname = usePathname()
   const searchParams = useSearchParams()
 
-  const searchQuery = searchParams.get('search') ?? ''
-  
-  const setSearchQuery = useCallback((query: string) => {
+  // 1. 로컬 상태로 검색어 관리 (입력 시 포커스 유지 및 자동 검색 방지)
+  const [searchQuery, setSearchQuery] = useState('')
+
+  // 2. URL에서 실제 활성화된 검색어 가져오기
+  const urlSearchQuery = searchParams.get('search') ?? ''
+
+  // 3. URL 변경 시 로컬 입력창 상태도 동기화 (예: 뒤로가기 등)
+  useEffect(() => {
+    setSearchQuery(urlSearchQuery)
+  }, [urlSearchQuery])
+
+  // 4. 엔터 입력 또는 돋보기 버튼 클릭 시 호출하여 URL 업데이트 및 검색 실행
+  const handleSearch = useCallback(() => {
     const params = new URLSearchParams(searchParams.toString())
-    if (query) {
-      params.set('search', query)
+    if (searchQuery.trim()) {
+      params.set('search', searchQuery.trim())
     } else {
       params.delete('search')
     }
-    // 스크롤 유지하며 URL 업데이트 (history에 스택 추가됨)
-    router.push(`${pathname}?${params.toString()}`, { scroll: false })
-  }, [searchParams, pathname, router])
+    setPage(1)
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+  }, [searchQuery, searchParams, pathname, router])
 
-  const debouncedQuery = useDebounce(searchQuery, 300)
+  // 5. 작성자 클릭 등 즉시 검색용 함수
+  const handleInstantSearch = useCallback((query: string) => {
+    setSearchQuery(query)
+    const params = new URLSearchParams(searchParams.toString())
+    if (query.trim()) {
+      params.set('search', query.trim())
+    } else {
+      params.delete('search')
+    }
+    setPage(1)
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+  }, [searchParams, pathname, router])
 
   // ── 데스크탑: 숫자 페이징 (useQuery) ──────────────────────────
   const { data: desktopData, isLoading: desktopLoading } = useQuery({
-    queryKey: debouncedQuery
-      ? ['searchForumPosts', 'fmkorea_stock', debouncedQuery, 'desktop', page]
+    queryKey: urlSearchQuery
+      ? ['searchForumPosts', 'fmkorea_stock', urlSearchQuery, 'desktop', page]
       : [...marketQueryKeys.forumPosts('fmkorea_stock'), 'desktop', page],
     queryFn: () =>
-      debouncedQuery
-        ? searchForumPosts({ source: 'fmkorea_stock', query: debouncedQuery, limit, page })
+      urlSearchQuery
+        ? searchForumPosts({ source: 'fmkorea_stock', query: urlSearchQuery, limit, page })
         : getForumPosts({ source: 'fmkorea_stock', limit, page }),
     enabled: viewType === 'desktop',
     staleTime: 1000 * 60 * 5,
@@ -60,12 +81,12 @@ export function useMarketData({ viewType }: { viewType: 'mobile' | 'desktop' }) 
     hasNextPage,
     isFetchingNextPage
   } = useInfiniteQuery({
-    queryKey: debouncedQuery
-      ? ['searchForumPosts', 'fmkorea_stock', debouncedQuery, 'mobile']
+    queryKey: urlSearchQuery
+      ? ['searchForumPosts', 'fmkorea_stock', urlSearchQuery, 'mobile']
       : [...marketQueryKeys.forumPosts('fmkorea_stock'), 'mobile'],
     queryFn: ({ pageParam }) =>
-      debouncedQuery
-        ? searchForumPosts({ source: 'fmkorea_stock', query: debouncedQuery, limit, cursor: pageParam })
+      urlSearchQuery
+        ? searchForumPosts({ source: 'fmkorea_stock', query: urlSearchQuery, limit, cursor: pageParam })
         : getForumPosts({ source: 'fmkorea_stock', limit, cursor: pageParam }),
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
@@ -128,7 +149,7 @@ export function useMarketData({ viewType }: { viewType: 'mobile' | 'desktop' }) 
   // 검색어 변경 시 페이지 초기화
   useEffect(() => {
     setPage(1)
-  }, [debouncedQuery])
+  }, [urlSearchQuery])
 
   return {
     indices,
@@ -147,5 +168,7 @@ export function useMarketData({ viewType }: { viewType: 'mobile' | 'desktop' }) 
     handleRefresh,
     searchQuery,
     setSearchQuery,
+    handleSearch,
+    handleInstantSearch,
   }
 }
