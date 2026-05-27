@@ -48,7 +48,7 @@ export default function AdminSidebar() {
             className="text-[13px] font-bold tracking-tight"
             style={{ color: 'var(--text-main)' }}
           >
-            Market Radar
+            개미 레이더
           </span>
           <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
             Hub
@@ -121,7 +121,7 @@ export default function AdminSidebar() {
 
         {/* 버전 */}
         <p className="mt-2 px-3 text-[10px]" style={{ color: 'var(--text-muted)' }}>
-          v0.1.0 · Market Radar Hub
+          v0.1.0 · 개미 레이더 허브
         </p>
       </div>
     </aside>

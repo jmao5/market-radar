@@ -37,7 +37,7 @@ export function MobileView() {
     <div className="flex flex-1 flex-col overflow-y-auto scrollbar-hide bg-[var(--bg-main)]">
       {/* 헤더 */}
       <div className="flex items-center justify-between px-5 py-3.5 sticky top-0 z-10 backdrop-blur-md bg-[var(--bg-main)]/80 border-b border-[var(--border-main)]">
-        <h1 className="text-[17px] font-bold text-[var(--text-main)] tracking-tight">📡 Market Radar</h1>
+        <h1 className="text-[17px] font-bold text-[var(--text-main)] tracking-tight">📡 개미 레이더</h1>
         <div className="flex items-center gap-2">
           <span className="text-[11px] font-medium text-[var(--text-muted)]">
             {dayjs(lastUpdated).format('HH:mm')}

@@ -107,7 +107,7 @@ export function useMarketData({ viewType }: { viewType: 'mobile' | 'desktop' }) 
     const supabase = createClient()
 
     const channel = supabase
-      .channel('market-radar-realtime')
+      .channel('gaemi-radar-realtime')
       .on(
         'postgres_changes',
         {
