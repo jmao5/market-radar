@@ -22,11 +22,21 @@ interface DesktopPostRowProps {
 // posted_at 우선, 없으면 scraped_at 폴백
 function displayTime(post: ForumPostSummary): string {
   const ts = post.posted_at ?? post.scraped_at
-  return dayjs(ts).fromNow()
+  if (!ts) return '—'
+  const d = dayjs(ts)
+  const now = dayjs()
+  if (d.isSame(now, 'year')) {
+    return d.format('MM.DD HH:mm')
+  } else {
+    return d.format('YY.MM.DD HH:mm')
+  }
 }
 
 // ── 모바일: 게시글 행 ─────────────────────────────────────────
 export function MobilePostRow({ post, onAuthorClick }: MobilePostRowProps) {
+  const ts = post.posted_at ?? post.scraped_at
+  const absoluteTime = ts ? dayjs(ts).format('YYYY-MM-DD HH:mm:ss') : ''
+
   return (
     <Link
       href={`/posts/${post.id}`}
@@ -66,7 +76,7 @@ export function MobilePostRow({ post, onAuthorClick }: MobilePostRowProps) {
               [{post.comment_count}]
             </span>
           )}
-          <span className="text-[var(--text-muted)]">{displayTime(post)}</span>
+          <span className="text-[var(--text-muted)]" title={absoluteTime}>{displayTime(post)}</span>
         </div>
       </div>
     </Link>
@@ -76,6 +86,9 @@ export function MobilePostRow({ post, onAuthorClick }: MobilePostRowProps) {
 // ── 데스크탑: 게시글 테이블 행 ───────────────────────────────
 export function DesktopPostRow({ post, index, onAuthorClick }: DesktopPostRowProps) {
   const router = useRouter()
+  const ts = post.posted_at ?? post.scraped_at
+  const absoluteTime = ts ? dayjs(ts).format('YYYY-MM-DD HH:mm:ss') : ''
+
   return (
     <tr
       className="group transition-colors cursor-pointer border-b border-[var(--border-subtle)] hover:bg-[var(--bg-sub)]"
@@ -119,7 +132,7 @@ export function DesktopPostRow({ post, index, onAuthorClick }: DesktopPostRowPro
       <td className="py-3.5 pr-4 text-[12px] w-20 text-right whitespace-nowrap text-[var(--text-muted)] group-hover:text-[var(--text-sub)] transition-colors">
         {post.view_count != null ? post.view_count.toLocaleString() : '—'}
       </td>
-      <td className="py-3.5 pr-6 text-[12px] w-24 text-right whitespace-nowrap text-[var(--text-muted)]">
+      <td className="py-3.5 pr-6 text-[12px] w-24 text-right whitespace-nowrap text-[var(--text-muted)]" title={absoluteTime}>
         {displayTime(post)}
       </td>
     </tr>

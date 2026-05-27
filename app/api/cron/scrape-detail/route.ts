@@ -14,6 +14,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import * as cheerio from 'cheerio'
 import { createClient } from '@supabase/supabase-js'
+import { parsePostedAt } from '../scrape/route'
 
 // ── Supabase 클라이언트 (요청당 1회) ─────────────────────────
 function getAdminClient() {
@@ -92,36 +93,7 @@ interface CommentRow {
   is_writer: boolean
 }
 
-function parsePostedAt(raw: string): string | null {
-  if (!raw) return null
-  const s = raw.trim()
 
-  const absMatch = s.match(/(\d{4})[.\-](\d{2})[.\-](\d{2})\s+(\d{2}):(\d{2})/)
-  if (absMatch) {
-    const [, y, mo, d, h, mi] = absMatch
-    const kst = new Date(`${y}-${mo}-${d}T${h}:${mi}:00+09:00`)
-    return isNaN(kst.getTime()) ? null : kst.toISOString()
-  }
-  const timeOnly = s.match(/^(\d{1,2}):(\d{2})$/)
-  if (timeOnly) {
-    const [, h, mi] = timeOnly
-    const now = new Date()
-    const kstNow = new Date(now.getTime() + 9 * 60 * 60 * 1000)
-    const y = kstNow.getUTCFullYear()
-    const mo = String(kstNow.getUTCMonth() + 1).padStart(2, '0')
-    const d = String(kstNow.getUTCDate()).padStart(2, '0')
-    const kst = new Date(`${y}-${mo}-${d}T${h.padStart(2, '0')}:${mi}:00+09:00`)
-    return isNaN(kst.getTime()) ? null : kst.toISOString()
-  }
-  const minMatch = s.match(/(\d+)\s*분\s*전/)
-  if (minMatch) return new Date(Date.now() - parseInt(minMatch[1]) * 60_000).toISOString()
-  const hrMatch = s.match(/(\d+)\s*시간\s*전/)
-  if (hrMatch) return new Date(Date.now() - parseInt(hrMatch[1]) * 3_600_000).toISOString()
-  const dayMatch = s.match(/(\d+)\s*일\s*전/)
-  if (dayMatch) return new Date(Date.now() - parseInt(dayMatch[1]) * 86_400_000).toISOString()
-
-  return null
-}
 
 function parseDetail(html: string): ParsedDetail {
   const $ = cheerio.load(html)
@@ -147,7 +119,7 @@ function parseDetail(html: string): ParsedDetail {
 
   // posted_at: 상세 페이지가 더 정확한 시각을 제공
   let postedAt: string | null = null
-  for (const sel of ['article .document_info .date', 'article header .date', 'time[datetime]', '.bd_wrp .date']) {
+  for (const sel of ['.rd_hd .date', 'span.date.m_no', 'article .document_info .date', 'article header .date', 'time[datetime]', '.bd_wrp .date']) {
     const el = $(sel).first()
     if (!el.length) continue
     const dt = el.attr('datetime')

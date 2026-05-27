@@ -287,7 +287,9 @@ export default function PostDetailClient({ id }: { id: string }) {
     )
   }
 
-  const displayTime = dayjs(post.posted_at ?? post.scraped_at).fromNow()
+  const ts = post.posted_at ?? post.scraped_at
+  const displayTime = ts ? dayjs(ts).format('YYYY.MM.DD HH:mm') : '—'
+  const absoluteTime = ts ? dayjs(ts).format('YYYY-MM-DD HH:mm:ss') : ''
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
@@ -322,7 +324,7 @@ export default function PostDetailClient({ id }: { id: string }) {
             <span className="text-[12px] font-semibold" style={{ color: 'var(--text-sub)' }}>
               {post.author ?? '익명'}
             </span>
-            <span className="flex items-center gap-1 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+            <span className="flex items-center gap-1 text-[11px]" style={{ color: 'var(--text-muted)' }} title={absoluteTime}>
               <BiTime size={11} /> {displayTime}
             </span>
             {post.view_count != null && (

@@ -22,16 +22,61 @@ export function parsePostedAt(timeStr: string): string | null {
   const t = timeStr.trim()
   if (!t) return null
 
-  if (/^\d{1,2}:\d{2}$/.test(t)) {
-    const [h, m] = t.split(':').map(Number)
-    const kstNow = new Date(Date.now() + 9 * 60 * 60 * 1000)
-    const kstDate = kstNow.toISOString().slice(0, 10)
-    return new Date(`${kstDate}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00+09:00`).toISOString()
+  // 1. Full absolute datetime: YYYY.MM.DD HH:mm or YYYY-MM-DD HH:mm
+  const fullDateTimeMatch = t.match(/^(\d{4})[.\-](\d{2})[.\-](\d{2})\s+(\d{2}):(\d{2})$/)
+  if (fullDateTimeMatch) {
+    const [, y, mo, d, h, mi] = fullDateTimeMatch
+    const kst = new Date(`${y}-${mo}-${d}T${h}:${mi}:00+09:00`)
+    return isNaN(kst.getTime()) ? null : kst.toISOString()
   }
 
+  // 2. Relative times like "5분 전" / "3시간 전" / "1일 전" (used on detail pages)
+  const minMatch = t.match(/(\d+)\s*분\s*전/)
+  if (minMatch) return new Date(Date.now() - parseInt(minMatch[1], 10) * 60_000).toISOString()
+  const hrMatch = t.match(/(\d+)\s*시간\s*전/)
+  if (hrMatch) return new Date(Date.now() - parseInt(hrMatch[1], 10) * 3_600_000).toISOString()
+  const dayMatch = t.match(/(\d+)\s*일\s*전/)
+  if (dayMatch) return new Date(Date.now() - parseInt(dayMatch[1], 10) * 86_400_000).toISOString()
+
+  // 3. Time only: HH:mm (e.g., "11:01" or "23:05")
+  if (/^\d{1,2}:\d{2}$/.test(t)) {
+    const [h, m] = t.split(':').map(Number)
+    const now = new Date()
+    // Current date in KST
+    const kstNow = new Date(now.getTime() + 9 * 60 * 60 * 1000)
+    const y = kstNow.getUTCFullYear()
+    const mo = String(kstNow.getUTCMonth() + 1).padStart(2, '0')
+    const d = String(kstNow.getUTCDate()).padStart(2, '0')
+    
+    let kst = new Date(`${y}-${mo}-${d}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00+09:00`)
+    
+    // If the parsed time is in the future by more than 15 minutes compared to now, it is from yesterday.
+    // (This happens on search pages where yesterday's posts within 24h are shown as HH:mm)
+    if (kst.getTime() - now.getTime() > 15 * 60 * 1000) {
+      kst = new Date(kst.getTime() - 24 * 60 * 60 * 1000)
+    }
+    return isNaN(kst.getTime()) ? null : kst.toISOString()
+  }
+
+  // 4. Date only: YYYY.MM.DD
+  if (/^\d{4}\.\d{2}\.\d{2}$/.test(t)) {
+    const [yyyy, mm, dd] = t.split('.').map(Number)
+    return new Date(`${yyyy}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}T00:00:00+09:00`).toISOString()
+  }
+
+  // 5. Date only: YY.MM.DD
   if (/^\d{2}\.\d{2}\.\d{2}$/.test(t)) {
     const [yy, mm, dd] = t.split('.').map(Number)
     return new Date(`${2000 + yy}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}T00:00:00+09:00`).toISOString()
+  }
+
+  // 6. Date only: MM.DD or MM/DD
+  const mmDdMatch = t.match(/^(\d{1,2})[.\/](\d{1,2})$/)
+  if (mmDdMatch) {
+    const [, mm, dd] = mmDdMatch
+    const kstNow = new Date(Date.now() + 9 * 60 * 60 * 1000)
+    const yyyyy = kstNow.getUTCFullYear()
+    return new Date(`${yyyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}T00:00:00+09:00`).toISOString()
   }
 
   return null
